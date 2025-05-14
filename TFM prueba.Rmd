@@ -1,0 +1,256 @@
+---
+title: "R pruebas API RIOT"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(httr)
+library(jsonlite)
+library(lubridate)
+library(dplyr)
+
+rm(list = ls())
+
+# ---------- CONFIGURACIÓN ----------
+api_key <- "RGAPI-ba1ce3dc-3b2b-464f-aafc-b7d5c594e850"
+routing <- "europe"
+region <- "EUW1"
+```
+
+
+```{r}
+# ---------- OBTENER PUUID ----------
+get_puuid_from_riot_id <- function(gameName, tagLine, routing, api_key) {
+# Codificar el nombre para la URL
+gameName_url <- URLencode(gameName, reserved = TRUE)
+
+# Construir la URL de la API
+url_account <- paste0("https://", routing,
+                      ".api.riotgames.com/riot/account/v1/accounts/by-riot-id/",
+                      gameName_url, "/", tagLine,
+                      "?api_key=", api_key)
+
+# Realizar la solicitud GET
+response_account <- GET(url_account)
+account_data <- fromJSON(content(response_account, "text"))
+
+# Comprobar que la respuesta fue exitosa (código 200)
+  if (status_code(response_account) != 200) {
+    warning("Error en la solicitud: código ", status_code(response_account))
+    return(NA)
+  }
+
+return(account_data$puuid)
+}
+```
+
+
+```{r}
+# ---------- OBTENER MATCH IDs ----------
+get_match_ids_by_puuid <- function(puuid, match_routing, api_key, num_matches) {
+
+# Construir la URL de la API
+url_matches <- paste0(
+  "https://", match_routing, ".api.riotgames.com/lol/match/v5/matches/by-puuid/",
+  puuid, "/ids?queue=420&start=0&count=", num_matches, "&api_key=", api_key
+)
+
+# Realizar la solicitud GET
+response_matches <- GET(url_matches)
+
+# Comprobar que la respuesta fue exitosa (código 200)
+if (status_code(response_matches) != 200) {
+  warning("Error en la solicitud: código ", status_code(response_matches))
+  return(NULL)  
+  }
+
+ # Parsear la respuesta JSON
+match_ids <- fromJSON(content(response_matches, "text"))
+return(match_ids)
+}
+
+```
+
+
+```{r}
+# ---------- EXTRAER INFO DE CADA PARTIDA ----------
+extract_soloQ_matches <- function(match_ids, match_routing, region, puuid, gameName, tagLine, api_key){
+  
+#Para conseguir el rango
+url <- paste0("https://", region, ".api.riotgames.com/lol/league/v4/entries/by-puuid/", puuid, "?api_key=", api_key)
+
+  res <- httr::GET(url)
+  
+  if (httr::status_code(res) == 200) {
+    ranked_data <- jsonlite::fromJSON(httr::content(res, "text"))
+    print(ranked_data)
+  }
+  tier <- ranked_data$tier
+  leaguePoints <- ranked_data$leaguePoints
+  
+  
+match_list <- list()
+for (match_id in match_ids) {
+  url_match_detail <- paste0(
+    "https://", match_routing, ".api.riotgames.com/lol/match/v5/matches/",
+    match_id, "?api_key=", api_key
+  )
+  
+  res_match <- GET(url_match_detail)
+  
+  #En testeo, no se si funciona
+  if (status_code(res_match) == 429) {
+  cat("⏳ Límite de peticiones alcanzado. Esperando 60 segundos...\n")
+  Sys.sleep(60)
+  next
+}
+  
+  if (status_code(res_match) == 200) {
+    match_data <- fromJSON(content(res_match, "text"))
+    
+    if (match_data$info$queueId == 420 && match_data$info$gameDuration > 900) {  # solo partidas Ranked Solo Q de más de 15 minutos
+      participants <- match_data$info$participants
+      player_data <- participants[participants$puuid == puuid, ]
+      
+      # Agregar fecha
+      timestamp <- match_data$info$gameStartTimestamp / 1000  # en segundos
+      player_data$date <- as_datetime(timestamp)
+      
+      # Variables indentificadoras
+      player_data$gameName <- gameName
+      player_data$tagLine <- tagLine
+      player_data$match_id <- match_id
+      player_data$gameDuration <- match_data$info$gameDuration
+      player_data$tier <- tier
+      player_data$leaguePoints <- leaguePoints
+   
+      #VARIABLES Objetivos
+      # Obtener el índice de la fila del equipo del jugador
+      teamId <- player_data$teamId
+      team_index <- which(match_data$info$teams$teamId == teamId)
+      
+      # Extraer todos los objetivos
+      objectives <- match_data$info$teams$objectives
+      # Sacar los kills para cada objetivo
+      baron_kills     <- objectives$baron$kills[team_index]
+      dragon_kills    <- objectives$dragon$kills[team_index]
+      tower_kills     <- objectives$tower$kills[team_index]
+      herald_kills    <- objectives$riftHerald$kills[team_index]
+      inhibitor_kills <- objectives$inhibitor$kills[team_index]
+      champion_kills  <- objectives$champion$kills[team_index]
+      
+      player_data$baron_kills <- baron_kills
+      player_data$dragon_kills <- dragon_kills
+      player_data$tower_kills  <- tower_kills
+      player_data$herald_kills <- herald_kills
+      player_data$inhibitor_kills <- inhibitor_kills
+      player_data$champion_kills <- champion_kills
+      
+      # VARIABLES SELECCIONADAS
+      selected_data <- player_data %>%
+        select(puuid, gameName, tagLine, tier, leaguePoints, match_id, gameDuration, championName, individualPosition, champLevel, goldEarned, totalMinionsKilled, kills, deaths, assists, totalDamageDealt, totalDamageTaken, damageDealtToBuildings, damageDealtToObjectives, damageDealtToTurrets, visionScore, baron_kills, dragon_kills, tower_kills, herald_kills, inhibitor_kills, champion_kills, win, date) 
+      
+      #guardamos las diferentes partidas
+      match_list[[match_id]] <- selected_data
+      Sys.sleep(1.2)
+    }
+  }
+}
+match_df <- bind_rows(match_list)
+
+return(match_df)
+}
+```
+
+
+```{r}
+#Testeo añadir registros
+players <- list(
+  list(realName = "Elyoya",   gameName = "komanche uchiha", tagLine = "elite"),
+  list(realName = "Caps",     gameName = "G2 Caps",         tagLine = "1323"),
+  list(realName = "Supa",     gameName = "tukaan",          tagLine = "tukan"),
+  list(realName = "113",      gameName = "BDS 113",         tagLine = "113"),
+  list(realName = "Razork",   gameName = "Razørk Activoo",  tagLine = "razzz"),
+  list(realName = "Humanoid", gameName = "Marek Brazda1",   tagLine = "DOG"),
+  list(realName = "JNX", gameName = "Simon Claw",   tagLine = "Agent"),
+  list(realName = "Larssen", gameName = "george kittle",   tagLine = "EUW"),
+  list(realName = "BrokenBlade", gameName = "G2 BrokenBlade",   tagLine = "1918"),
+  list(realName = "Kamiloo", gameName = "Club Loukizz",   tagLine = "ama"),
+  list(realName = "Labrov", gameName = "G2 Labrov",   tagLine = "8085")
+)
+
+df_players <- do.call(rbind, lapply(players, as.data.frame))
+
+# Inicializamos la lista para guardar los datos
+all_matches <- list()
+
+# Iteramos sobre cada fila del dataframe
+for (i in 1:nrow(df_players)) {
+  gameName <- df_players$gameName[i]
+  tagLine  <- df_players$tagLine[i]
+  realName <- df_players$realName[i]
+  
+  cat("⏳ Procesando a", realName, "(", gameName, "#", tagLine, ")\n")
+  
+  # Paso 1: Obtener puuid
+  puuid <- tryCatch({
+    get_puuid_from_riot_id(gameName, tagLine, "europe", api_key)
+  }, error = function(e) {
+    cat("❌ Error al obtener puuid para", gameName, "\n")
+    return(NULL)
+  })
+  
+  if (is.null(puuid)) next
+  
+  # Paso 2: Obtener IDs de partidas
+  match_ids <- tryCatch({
+    get_match_ids_by_puuid(puuid, "europe", api_key, 1)
+  }, error = function(e) {
+    cat("❌ Error al obtener match_ids para", gameName, "\n")
+    return(NULL)
+  })
+  
+  if (is.null(match_ids)) next
+  
+  # Paso 3: Extraer info de las partidas soloQ
+  match_df <- tryCatch({
+    extract_soloQ_matches(match_ids, "europe", region, puuid, gameName, tagLine, api_key)
+  }, error = function(e) {
+    cat("❌ Error al extraer matches para", gameName, "\n")
+    return(NULL)
+  })
+  
+  if (!is.null(match_df) && nrow(match_df) > 0) {
+    match_df$realName <- realName  # Agregar nombre real como columna
+    all_matches[[realName]] <- match_df
+  }
+  
+  # Esperamos un poco para no sobrecargar la API
+  Sys.sleep(5)
+}
+
+# Combinar todo en un único data.frame
+final_df <- dplyr::bind_rows(all_matches)
+```
+
+
+```{r}
+# Guardar como CSV
+write.csv(final_df, "soloQ_partidas.csv", row.names = FALSE, na = "")
+
+cat("✅ Archivo CSV guardado correctamente como 'soloQ_partidas.csv'\n")
+
+#cargamos info del csv para comprobar que esta todo correcto
+df <- read.csv("soloQ_partidas.csv", stringsAsFactors = FALSE)
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
