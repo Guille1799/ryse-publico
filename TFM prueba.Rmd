@@ -16,36 +16,10 @@ library(dplyr)
 rm(list = ls())
 
 # ---------- CONFIGURACIÓN ----------
-api_key <- "RGAPI-ba1ce3dc-3b2b-464f-aafc-b7d5c594e850"
+#api_key <- "RGAPI-ba1ce3dc-3b2b-464f-aafc-b7d5c594e850" --Antigua
+api_key <- "RGAPI-aa411d3a-19eb-4560-97df-7271c20cf17f"
 routing <- "europe"
 region <- "EUW1"
-```
-
-
-```{r}
-# ---------- OBTENER PUUID ----------
-get_puuid_from_riot_id <- function(gameName, tagLine, routing, api_key) {
-# Codificar el nombre para la URL
-gameName_url <- URLencode(gameName, reserved = TRUE)
-
-# Construir la URL de la API
-url_account <- paste0("https://", routing,
-                      ".api.riotgames.com/riot/account/v1/accounts/by-riot-id/",
-                      gameName_url, "/", tagLine,
-                      "?api_key=", api_key)
-
-# Realizar la solicitud GET
-response_account <- GET(url_account)
-account_data <- fromJSON(content(response_account, "text"))
-
-# Comprobar que la respuesta fue exitosa (código 200)
-  if (status_code(response_account) != 200) {
-    warning("Error en la solicitud: código ", status_code(response_account))
-    return(NA)
-  }
-
-return(account_data$puuid)
-}
 ```
 
 
@@ -90,6 +64,7 @@ url <- paste0("https://", region, ".api.riotgames.com/lol/league/v4/entries/by-p
     print(ranked_data)
   }
   tier <- ranked_data$tier
+  print(tier)
   leaguePoints <- ranked_data$leaguePoints
   
   
@@ -168,93 +143,7 @@ return(match_df)
 
 
 ```{r}
-#Testeo añadir registros
-players <- list(
-  list(realName = "Elyoya",   gameName = "komanche uchiha", tagLine = "elite"),
-  list(realName = "Caps",     gameName = "G2 Caps",         tagLine = "1323"),
-  list(realName = "Supa",     gameName = "tukaan",          tagLine = "tukan"),
-  list(realName = "113",      gameName = "BDS 113",         tagLine = "113"),
-  list(realName = "Razork",   gameName = "Razørk Activoo",  tagLine = "razzz"),
-  list(realName = "Humanoid", gameName = "Marek Brazda1",   tagLine = "DOG"),
-  list(realName = "JNX", gameName = "Simon Claw",   tagLine = "Agent"),
-  list(realName = "Larssen", gameName = "george kittle",   tagLine = "EUW"),
-  list(realName = "BrokenBlade", gameName = "G2 BrokenBlade",   tagLine = "1918"),
-  list(realName = "Kamiloo", gameName = "Club Loukizz",   tagLine = "ama"),
-  list(realName = "Labrov", gameName = "G2 Labrov",   tagLine = "8085")
-)
-
-df_players <- do.call(rbind, lapply(players, as.data.frame))
-
-# Inicializamos la lista para guardar los datos
-all_matches <- list()
-
-# Iteramos sobre cada fila del dataframe
-for (i in 1:nrow(df_players)) {
-  gameName <- df_players$gameName[i]
-  tagLine  <- df_players$tagLine[i]
-  realName <- df_players$realName[i]
-  
-  cat("⏳ Procesando a", realName, "(", gameName, "#", tagLine, ")\n")
-  
-  # Paso 1: Obtener puuid
-  puuid <- tryCatch({
-    get_puuid_from_riot_id(gameName, tagLine, "europe", api_key)
-  }, error = function(e) {
-    cat("❌ Error al obtener puuid para", gameName, "\n")
-    return(NULL)
-  })
-  
-  if (is.null(puuid)) next
-  
-  # Paso 2: Obtener IDs de partidas
-  match_ids <- tryCatch({
-    get_match_ids_by_puuid(puuid, "europe", api_key, 1)
-  }, error = function(e) {
-    cat("❌ Error al obtener match_ids para", gameName, "\n")
-    return(NULL)
-  })
-  
-  if (is.null(match_ids)) next
-  
-  # Paso 3: Extraer info de las partidas soloQ
-  match_df <- tryCatch({
-    extract_soloQ_matches(match_ids, "europe", region, puuid, gameName, tagLine, api_key)
-  }, error = function(e) {
-    cat("❌ Error al extraer matches para", gameName, "\n")
-    return(NULL)
-  })
-  
-  if (!is.null(match_df) && nrow(match_df) > 0) {
-    match_df$realName <- realName  # Agregar nombre real como columna
-    all_matches[[realName]] <- match_df
-  }
-  
-  # Esperamos un poco para no sobrecargar la API
-  Sys.sleep(5)
-}
-
-# Combinar todo en un único data.frame
-final_df <- dplyr::bind_rows(all_matches)
-```
-
-
-```{r}
-# Guardar como CSV
-write.csv(final_df, "soloQ_partidas.csv", row.names = FALSE, na = "")
-
-cat("✅ Archivo CSV guardado correctamente como 'soloQ_partidas.csv'\n")
-
-#cargamos info del csv para comprobar que esta todo correcto
-df <- read.csv("soloQ_partidas.csv", stringsAsFactors = FALSE)
-
-```
-
-```{r}
 # Sacar lista de jugadores de Master, GrandMaster y Challenger
-library(httr)
-library(jsonlite)
-library(dplyr)
-
 get_master_players_puuids <- function(region, queue, api_key) {
   
   # Construir la URL
@@ -317,6 +206,98 @@ get_challenger_players_puuids <- function(region, queue, api_key) {
     return(NULL)
   }
 }
+
+```
+
+
+```{r}
+
+queue <- "RANKED_SOLO_5x5"
+# Obtener lista de jugadores Master
+master_players_puuids <- get_master_players_puuids(region, queue, api_key)
+
+# Obtener lista de jugadores Grandmaster
+grandmaster_players_puuids <- get_grandmaster_players_puuids(region, queue, api_key)
+
+# Obtener lista de jugadores Challenger
+challenger_players_puuids <- get_challenger_players_puuids(region, queue, api_key)
+
+# Combinar las listas (eliminar NULLs si alguna petición falló)
+all_high_elo_puuids <- bind_rows(
+  if (!is.null(master_players_puuids)) master_players_puuids else data.frame(),
+  if (!is.null(grandmaster_players_puuids)) grandmaster_players_puuids else data.frame(),
+  if (!is.null(challenger_players_puuids)) challenger_players_puuids else data.frame()
+)
+
+# Imprimir el resultado
+if (!is.null(all_high_elo_puuids) && nrow(all_high_elo_puuids) > 0) {
+  cat("\n--- Lista de PUUIDs de jugadores Master, Grandmaster y Challenger ---\n")
+  print(all_high_elo_puuids)
+  cat("\nTotal de jugadores encontrados:", nrow(all_high_elo_puuids), "\n")
+} else {
+  cat("\n⚠️ No se encontraron jugadores Master, Grandmaster o Challenger en la región y cola especificadas.\n")
+}
+
+```
+```{r}
+# 1. Elegir 100 puuids al azar
+num_puuids_to_sample <- min(100, nrow(all_high_elo_puuids))
+if (num_puuids_to_sample > 0) {
+  set.seed(42) # Para reproducibilidad
+  random_puuids <- sample(all_high_elo_puuids$puuid, num_puuids_to_sample)
+} else {
+  random_puuids <- character(0)
+  cat("Advertencia: No hay PUUIDs disponibles en 'all_high_elo_puuids'.\n")
+}
+
+#Iterar sobre los puuids aleatorios y obtener los datos
+all_match_data <- list()
+
+cat("Obteniendo datos de partidas para", length(random_puuids), "jugadores...\n")
+
+for (i in 1:length(random_puuids)) {
+  puuid <- random_puuids[i]
+  cat("Procesando PUUID:", puuid, "(", i, "/", length(random_puuids), ")\n")
+
+  tryCatch({
+    # Obtener el ID de la partida
+    match_id_list <- get_match_ids_by_puuid(puuid, "europe", api_key, 1)
+
+    # Extraer la información de la partida
+    match_data <- extract_soloQ_matches(
+      match_id_list,
+      "europe",
+      region,
+      puuid, # Usar el puuid actual para extraer sus datos
+      "",    # gameName (no necesario para esta extracción)
+      "",    # tagLine (no necesario para esta extracción)
+      api_key
+    )
+
+    if (!is.null(match_data)) {
+      all_match_data[[puuid]] <- match_data
+    }
+    Sys.sleep(2) # Respetar rate limits entre jugadores
+  }, error = function(e) {
+    warning("Error al procesar PUUID ", puuid, ": ", e$message, ". Saltando al siguiente PUUID.\n")
+  })
+}
+
+# 4. Juntar todos los resultados en un dataframe
+final_match_data_df <- bind_rows(all_match_data)
+
+# Imprimir el dataframe resultante
+if (!is.null(final_match_data_df) && nrow(final_match_data_df) > 0) {
+  cat("\n--- Datos de partidas obtenidas ---\n")
+  print(final_match_data_df)
+  cat("\nSe obtuvieron datos de", length(unique(final_match_data_df$puuid)), "jugadores.\n")
+} else {
+  cat("\n⚠️ No se obtuvieron datos de partidas para los jugadores seleccionados.\n")
+}
+
+
+# Guardar como CSV
+write.csv(final_match_data_df, "random_sample_test.csv", row.names = FALSE, na = "")
 
 ```
 
