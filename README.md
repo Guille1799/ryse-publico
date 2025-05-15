@@ -3,6 +3,9 @@
 
 Este proyecto forma parte del Trabajo de Fin de Máster (TFM) y tiene como objetivo analizar el rendimiento y comportamiento de jugadores profesionales de **League of Legends (LoL)** utilizando datos obtenidos mediante la **API oficial de Riot Games**.
 
+Enlace al documento del proyecto: [https://docs.google.com/document/d/1eidNoR7E6L5WWEgmf1BtzN6xazL0aB-b/edit?usp=sharing&ouid=105307291187483947765&rtpof=true&sd=true
+](Documento)
+
 El análisis se realiza a través de R y R Markdown, recopilando partidas clasificadas recientes de jugadores seleccionados, extrayendo estadísticas clave y generando un dataset unificado para su posterior análisis.
 
 ---
