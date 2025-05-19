@@ -5,6 +5,8 @@ Este proyecto forma parte del Trabajo de Fin de Máster (TFM) y tiene como objet
 
 Enlace al documento del proyecto: [Documento de Google](https://docs.google.com/document/d/1eidNoR7E6L5WWEgmf1BtzN6xazL0aB-b/edit?usp=sharing&ouid=105307291187483947765&rtpof=true&sd=true)
 
+Enlace a Outline y Planificación de las Tareas: Outline Metedología y Desarrollo: https://docs.google.com/document/d/1-xVnkuvqqZI0_UUrvR2LCbB2vsJqk2nCJonvTQYsBsA/edit?usp=sharing y Planificación de Tareas: https://docs.google.com/spreadsheets/d/1CuY2KTSSd9vutyjWNhCmVz7AMuAKnRWjWEdgWc6cSqU/edit?usp=sharing
+
 El análisis se realiza a través de R y R Markdown, recopilando partidas clasificadas recientes de jugadores seleccionados, extrayendo estadísticas clave y generando un dataset unificado para su posterior análisis.
 
 ---
