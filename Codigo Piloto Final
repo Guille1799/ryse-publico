@@ -1,0 +1,382 @@
+---
+title: "R pruebas API RIOT"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(httr)
+library(jsonlite)
+library(lubridate)
+library(dplyr)
+
+rm(list = ls())
+
+# ---------- CONFIGURACIÓN ----------
+api_key <- "RGAPI-32cff97f-26f9-4da5-be34-f3cc4f52a196"
+routing <- "europe"
+region <- "EUW1"
+```
+
+
+```{r}
+# ---------- OBTENER MATCH IDs ----------
+get_match_ids_by_puuid <- function(puuid, match_routing, api_key, num_matches) {
+
+# Construir la URL de la API
+url_matches <- paste0(
+  "https://", match_routing, ".api.riotgames.com/lol/match/v5/matches/by-puuid/",
+  puuid, "/ids?queue=420&start=0&count=", num_matches, "&api_key=", api_key
+)
+
+# Realizar la solicitud GET
+response_matches <- GET(url_matches)
+
+# Comprobar que la respuesta fue exitosa (código 200)
+if (status_code(response_matches) != 200) {
+  warning("Error en la solicitud: código ", status_code(response_matches))
+  return(NULL)  
+  }
+
+ # Parsear la respuesta JSON
+match_ids <- fromJSON(content(response_matches, "text"))
+return(match_ids)
+}
+
+```
+
+
+```{r}
+# ---------- EXTRAER INFO DE CADA PARTIDA ----------
+extract_soloQ_matches <- function(match_ids, match_routing, region, puuid, gameName, tagLine, api_key){
+  
+#Para conseguir el rango
+url <- paste0("https://", region, ".api.riotgames.com/lol/league/v4/entries/by-puuid/", puuid, "?api_key=", api_key)
+
+  res <- httr::GET(url)
+  
+  if (httr::status_code(res) == 200) {
+    ranked_data <- jsonlite::fromJSON(httr::content(res, "text"))
+    print(ranked_data)
+  }
+  tier <- ranked_data$tier
+  print(tier)
+  leaguePoints <- ranked_data$leaguePoints
+  
+  
+match_list <- list()
+for (match_id in match_ids) {
+  url_match_detail <- paste0(
+    "https://", match_routing, ".api.riotgames.com/lol/match/v5/matches/",
+    match_id, "?api_key=", api_key
+  )
+  
+  res_match <- GET(url_match_detail)
+  
+  #En testeo, no se si funciona
+  if (status_code(res_match) == 429) {
+  cat("⏳ Límite de peticiones alcanzado. Esperando 60 segundos...\n")
+  Sys.sleep(60)
+  next
+}
+  
+  if (status_code(res_match) == 200) {
+    match_data <- fromJSON(content(res_match, "text"))
+    
+    if (match_data$info$queueId == 420 && match_data$info$gameDuration > 900) {  # solo partidas Ranked Solo Q de más de 15 minutos
+      participants <- match_data$info$participants
+      player_data <- participants[participants$puuid == puuid, ]
+      
+      # Agregar fecha
+      timestamp <- match_data$info$gameStartTimestamp / 1000  # en segundos
+      player_data$date <- as_datetime(timestamp)
+      
+      # Variables indentificadoras
+      player_data$gameName <- gameName
+      player_data$tagLine <- tagLine
+      player_data$match_id <- match_id
+      player_data$gameDuration <- match_data$info$gameDuration
+      player_data$tier <- tier
+      player_data$leaguePoints <- leaguePoints
+   
+      #VARIABLES Objetivos
+      # Obtener el índice de la fila del equipo del jugador
+      teamId <- player_data$teamId
+      team_index <- which(match_data$info$teams$teamId == teamId)
+      
+      # Extraer todos los objetivos
+      objectives <- match_data$info$teams$objectives
+      # Sacar los kills para cada objetivo
+      baron_kills     <- objectives$baron$kills[team_index]
+      dragon_kills    <- objectives$dragon$kills[team_index]
+      tower_kills     <- objectives$tower$kills[team_index]
+      herald_kills    <- objectives$riftHerald$kills[team_index]
+      inhibitor_kills <- objectives$inhibitor$kills[team_index]
+      champion_kills  <- objectives$champion$kills[team_index]
+      
+      player_data$baron_kills <- baron_kills
+      player_data$dragon_kills <- dragon_kills
+      player_data$tower_kills  <- tower_kills
+      player_data$herald_kills <- herald_kills
+      player_data$inhibitor_kills <- inhibitor_kills
+      player_data$champion_kills <- champion_kills
+      
+      # VARIABLES SELECCIONADAS
+      selected_data <- player_data %>%
+        select(puuid, gameName, tagLine, tier, leaguePoints, match_id, gameDuration, championName, individualPosition, champLevel, goldEarned, totalMinionsKilled, kills, deaths, assists, totalDamageDealt, totalDamageTaken, damageDealtToBuildings, damageDealtToObjectives, damageDealtToTurrets, visionScore, baron_kills, dragon_kills, tower_kills, herald_kills, inhibitor_kills, champion_kills, win, date) 
+      
+      #guardamos las diferentes partidas
+      match_list[[match_id]] <- selected_data
+      Sys.sleep(1.2)
+    }
+  }
+}
+match_df <- bind_rows(match_list)
+
+return(match_df)
+}
+```
+
+
+```{r}
+# Sacar lista de jugadores de Master, GrandMaster y Challenger
+get_master_players_puuids <- function(region, queue, api_key) {
+  
+  # Construir la URL
+  url <- paste0("https://", region, ".api.riotgames.com/lol/league/v4/masterleagues/by-queue/",
+                queue, "?api_key=", api_key)
+  
+  # Llamada a la API
+  res <- GET(url)
+  
+  # Procesar respuesta
+  if (status_code(res) == 200) {
+    players_info <- fromJSON(content(res, "text"))
+    
+    # Extraer puuid
+    df_players_master <- as.data.frame(players_info$entries) %>%
+      select(puuid)
+    
+    return(df_players_master)
+    Sys.sleep(2)
+    
+  } else {
+    cat("❌ Error HTTP:", status_code(res), "\n")
+    return(NULL)
+  }
+}
+
+
+get_grandmaster_players_puuids <- function(region, queue, api_key) {
+  url <- paste0("https://", region, ".api.riotgames.com/lol/league/v4/grandmasterleagues/by-queue/",
+                queue, "?api_key=", api_key)
+  
+  res <- GET(url)
+  
+  if (status_code(res) == 200) {
+    players_info <- fromJSON(content(res, "text"))
+    df <- as.data.frame(players_info$entries) %>%
+      select(puuid)
+    return(df)
+    Sys.sleep(2)
+  } else {
+    cat("❌ Error HTTP:", status_code(res), "\n")
+    return(NULL)
+  }
+}
+
+get_challenger_players_puuids <- function(region, queue, api_key) {
+  url <- paste0("https://", region, ".api.riotgames.com/lol/league/v4/challengerleagues/by-queue/",
+                queue, "?api_key=", api_key)
+  
+  res <- GET(url)
+  
+  if (status_code(res) == 200) {
+    players_info <- fromJSON(content(res, "text"))
+    df <- as.data.frame(players_info$entries) %>%
+      select(puuid)
+    return(df)
+    Sys.sleep(2)
+  } else {
+    cat("❌ Error HTTP:", status_code(res), "\n")
+    return(NULL)
+  }
+}
+
+```
+
+
+```{r}
+
+queue <- "RANKED_SOLO_5x5"
+# Obtener lista de jugadores Master
+master_players_puuids <- get_master_players_puuids(region, queue, api_key)
+
+# Obtener lista de jugadores Grandmaster
+grandmaster_players_puuids <- get_grandmaster_players_puuids(region, queue, api_key)
+
+# Obtener lista de jugadores Challenger
+challenger_players_puuids <- get_challenger_players_puuids(region, queue, api_key)
+
+# Combinar las listas (eliminar NULLs si alguna petición falló)
+all_high_elo_puuids <- bind_rows(
+  if (!is.null(master_players_puuids)) master_players_puuids else data.frame(),
+  if (!is.null(grandmaster_players_puuids)) grandmaster_players_puuids else data.frame(),
+  if (!is.null(challenger_players_puuids)) challenger_players_puuids else data.frame()
+)
+
+# Imprimir el resultado
+if (!is.null(all_high_elo_puuids) && nrow(all_high_elo_puuids) > 0) {
+  cat("\n--- Lista de PUUIDs de jugadores Master, Grandmaster y Challenger ---\n")
+  print(all_high_elo_puuids)
+  cat("\nTotal de jugadores encontrados:", nrow(all_high_elo_puuids), "\n")
+} else {
+  cat("\n⚠️ No se encontraron jugadores Master, Grandmaster o Challenger en la región y cola especificadas.\n")
+}
+
+```
+```{r}
+# 1. Elegir 100 puuids al azar
+num_puuids_to_sample <- min(20, nrow(all_high_elo_puuids))
+if (num_puuids_to_sample > 0) {
+  set.seed(42) # Para reproducibilidad
+  random_puuids <- sample(all_high_elo_puuids$puuid, num_puuids_to_sample)
+} else {
+  random_puuids <- character(0)
+  cat("Advertencia: No hay PUUIDs disponibles en 'all_high_elo_puuids'.\n")
+}
+
+#Iterar sobre los puuids aleatorios y obtener los datos
+all_match_data <- list()
+
+cat("Obteniendo datos de partidas para", length(random_puuids), "jugadores...\n")
+
+for (i in 1:length(random_puuids)) {
+  puuid <- random_puuids[i]
+  cat("Procesando PUUID:", puuid, "(", i, "/", length(random_puuids), ")\n")
+
+  tryCatch({
+    # Obtener el ID de la partida
+    match_id_list <- get_match_ids_by_puuid(puuid, "europe", api_key, 2)
+
+    # Extraer la información de la partida
+    match_data <- extract_soloQ_matches(
+      match_id_list,
+      "europe",
+      region,
+      puuid, # Usar el puuid actual para extraer sus datos
+      "",    # gameName (no necesario para esta extracción)
+      "",    # tagLine (no necesario para esta extracción)
+      api_key
+    )
+
+    if (!is.null(match_data)) {
+      all_match_data[[puuid]] <- match_data
+    }
+    Sys.sleep(2) # Respetar rate limits entre jugadores
+  }, error = function(e) {
+    warning("Error al procesar PUUID ", puuid, ": ", e$message, ". Saltando al siguiente PUUID.\n")
+  })
+}
+
+# 4. Juntar todos los resultados en un dataframe
+final_match_data_df <- bind_rows(all_match_data)
+
+# Imprimir el dataframe resultante
+if (!is.null(final_match_data_df) && nrow(final_match_data_df) > 0) {
+  cat("\n--- Datos de partidas obtenidas ---\n")
+  print(final_match_data_df)
+  cat("\nSe obtuvieron datos de", length(unique(final_match_data_df$puuid)), "jugadores.\n")
+} else {
+  cat("\n⚠️ No se obtuvieron datos de partidas para los jugadores seleccionados.\n")
+}
+
+
+# Guardar como CSV
+write.csv(final_match_data_df, "random_sample_test.csv", row.names = FALSE, na = "")
+```
+
+
+```{r}
+# ---------- CÁLCULO DE VARIABLES DERIVADAS Y AGREGACIÓN POR JUGADOR Y ROL ----------
+
+df <- read.csv("random_sample_test.csv", stringsAsFactors = FALSE)
+
+library(dplyr)
+
+# Paso 1: Crear métricas derivadas por partida
+df_indicadores <- df %>%
+  mutate(
+    minutos = gameDuration / 60,
+    gpm = goldEarned / minutos,
+    kda_ajustado = ifelse(deaths == 0,
+                          kills + assists,
+                          (kills + assists) / deaths),
+    torre_pct = tower_kills / max(tower_kills, na.rm = TRUE),
+    #Revisar porque son variables grupales
+    objetivo_control = (dragon_kills + baron_kills + herald_kills + inhibitor_kills) / minutos
+  )
+
+# Paso 2: Agregar métricas por jugador y rol
+indicadores_por_jugador_rol <- df_indicadores %>%
+  group_by(puuid, individualPosition, tier) %>%
+  summarise(
+    partidas = n(),
+    winrate = mean(win == TRUE) * 100,
+    gpm_promedio = mean(gpm, na.rm = TRUE),
+    kda_promedio = mean(kda_ajustado, na.rm = TRUE),
+    torre_pct_promedio = mean(torre_pct, na.rm = TRUE),
+    inhibidores_totales = sum(inhibitor_kills, na.rm = TRUE),
+    control_objetivos = mean(objetivo_control, na.rm = TRUE),
+    .groups = "drop"
+  ) #%>%
+  #filter(partidas >= 5)
+write.csv(indicadores_por_jugador_rol, "dataset_modelado_jugador_rol.csv", row.names = FALSE)
+```
+
+
+```{r}
+# ---------- CLUSTERING K-MEANS ----------
+library(ggplot2)
+
+df_model <- read.csv("dataset_modelado_jugador_rol.csv", stringsAsFactors = FALSE)
+
+# Paso 1: Selección y normalización de variables numéricas
+df_model_numeric <- df_model %>%
+  select(gpm_promedio, kda_promedio, torre_pct_promedio, control_objetivos)
+
+df_model_scaled <- scale(df_model_numeric)
+
+# Paso 2: Aplicar K-means
+set.seed(123)
+kmeans_result <- kmeans(df_model_scaled, centers = 3)
+
+# Añadir clúster al dataframe original
+df_model$cluster <- as.factor(kmeans_result$cluster)
+
+# Paso 3: Visualización 2D (ejemplo)
+ggplot(df_model, aes(x = gpm_promedio, y = kda_promedio, color = cluster)) +
+  geom_point(size = 3, alpha = 0.8) +
+  labs(title = "Clustering de jugadores por estilo de juego",
+       x = "Oro por minuto (GPM)", y = "KDA ajustado promedio") +
+  theme_minimal()
+```
+
+
+```{r}
+# ---------- ANÁLISIS DE CLÚSTERES POR ROL ----------
+df_model %>%
+  group_by(individualPosition, cluster) %>%
+  summarise(jugadores = n()) %>%
+  arrange(individualPosition, cluster)
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
