@@ -260,7 +260,7 @@ for (i in 1:length(random_puuids)) {
 
   tryCatch({
     # Obtener el ID de la partida
-    match_id_list <- get_match_ids_by_puuid(puuid, "europe", api_key, 2)
+    match_id_list <- get_match_ids_by_puuid(puuid, "europe", api_key, 50)
 
     # Extraer la información de la partida
     match_data <- extract_soloQ_matches(
