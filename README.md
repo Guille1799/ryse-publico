@@ -30,7 +30,9 @@ El análisis se realiza a través de R y R Markdown, recopilando partidas clasif
   - `.Renviron`: archivo con la clave `api_key` de Riot Games
   - `datos/*.csv`: exportación o almacenamiento de resultados si aplica
 
-<span style="color:red"> NOTA (DLU): Faltan los datos en crudo obtenidos con vuestro código de consultas, el código de depuración y los datos depurados...</span>
+> [!CAUTION]
+> NOTA DLU: Faltan los datos en crudo obtenidos con vuestro código de consultas, el código de depuración y los datos depurados.
+
 ---
 
 ## Cómo ejecutar el proyecto
@@ -39,4 +41,5 @@ El análisis se realiza a través de R y R Markdown, recopilando partidas clasif
    ```bash
    git clone https://github.com/tuusuario/nombre-repo.git
 
-<span style="color:red"> NOTA (DLU): El repositorio es privado, luego no se puede clonar...</span>
+> [!CAUTION]
+> NOTA DLU: El repositorio es privado, luego no se puede clonar...
