@@ -32,6 +32,7 @@ El análisis se realiza a través de R y R Markdown, recopilando partidas clasif
 
 > [!CAUTION]
 > NOTA DLU: Faltan los datos en crudo obtenidos con vuestro código de consultas, el código de depuración y los datos depurados.
+> NOTA DLU: En el repositorio al menos debería haber una carpeta con los datos raw y depurados, una carpeta para todo el código definitivo que se elabore y otra con los informes, tablas y figuras que queráis mostrar...
 
 ---
 
