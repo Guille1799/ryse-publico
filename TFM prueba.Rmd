@@ -16,8 +16,7 @@ library(dplyr)
 rm(list = ls())
 
 # ---------- CONFIGURACIÓN ----------
-#api_key <- "RGAPI-ba1ce3dc-3b2b-464f-aafc-b7d5c594e850" --Antigua
-api_key <- "RGAPI-aa411d3a-19eb-4560-97df-7271c20cf17f"
+api_key <- "RGAPI-ab0c8026-b505-4912-9850-6fff750af346"
 routing <- "europe"
 region <- "EUW1"
 ```
@@ -127,7 +126,7 @@ for (match_id in match_ids) {
       
       # VARIABLES SELECCIONADAS
       selected_data <- player_data %>%
-        select(puuid, gameName, tagLine, tier, leaguePoints, match_id, gameDuration, championName, individualPosition, champLevel, goldEarned, totalMinionsKilled, kills, deaths, assists, totalDamageDealt, totalDamageTaken, damageDealtToBuildings, damageDealtToObjectives, damageDealtToTurrets, visionScore, baron_kills, dragon_kills, tower_kills, herald_kills, inhibitor_kills, champion_kills, win, date) 
+        select(puuid, gameName, tagLine, tier, leaguePoints, match_id, gameDuration, championName, individualPosition, champLevel, goldEarned, totalMinionsKilled, kills, deaths, assists, totalDamageDealt, totalDamageTaken, damageDealtToBuildings, damageDealtToObjectives, damageDealtToTurrets, visionScore, baron_kills, dragon_kills, tower_kills, herald_kills, inhibitor_kills, champion_kills, win, date,longestTimeSpentLiving, timeCCingOthers, timePlayed, totalTimeCCDealt, totalTimeSpentDead, completeSupportQuestInTime, firstTurretKilledTime, mejaisFullStackInTime) 
       
       #guardamos las diferentes partidas
       match_list[[match_id]] <- selected_data
@@ -239,6 +238,50 @@ if (!is.null(all_high_elo_puuids) && nrow(all_high_elo_puuids) > 0) {
 }
 
 ```
+```{r}
+#Pruebas de timeline 
+
+#get_match_ids_by_puuid(all_high_elo_puuids$puuid[1], "europe", api_key, 50)
+
+
+get_match_timeline_by_puuid <- function(puuid, api_key, region = "europe", match_index = 1) {
+  # Paso 1: Obtener últimos match IDs
+  matchlist_url <- paste0("https://", region, ".api.riotgames.com/lol/match/v5/matches/by-puuid/", puuid, "/ids?start=0&count=5")
+  matchlist_response <- GET(matchlist_url, add_headers("X-Riot-Token" = api_key))
+  
+  if (status_code(matchlist_response) != 200) {
+    stop("Error al obtener la lista de partidas: ", content(matchlist_response, "text"))
+  }
+  
+  match_ids <- fromJSON(content(matchlist_response, "text"))
+  match_id <- match_ids[match_index]
+  
+ 
+  timeline_url <- paste0("https://", region, ".api.riotgames.com/lol/match/v5/matches/", match_id, "/timeline")
+  timeline_response <- GET(timeline_url, add_headers("X-Riot-Token" = api_key))
+  
+  if (status_code(timeline_response) != 200) {
+    stop("Error al obtener el timeline de la partida: ", content(timeline_response, "text"))
+  }
+  
+  timeline_data <- fromJSON(content(timeline_response, "text"), flatten = TRUE)
+  
+  return(timeline_data)
+}
+
+
+data_timeline <- get_match_timeline_by_puuid(all_high_elo_puuids$puuid[1], api_key, "europe")
+
+
+
+```
+
+```{r}
+for (puuid in all_high_elo_puuids$puuid){
+  print(get_match_ids_by_puuid(puuid, "europe", api_key, 1))
+}
+```
+
 ```{r}
 # 1. Elegir 100 puuids al azar
 num_puuids_to_sample <- min(100, nrow(all_high_elo_puuids))
