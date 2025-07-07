@@ -181,7 +181,7 @@ get_match_stats_by_puuid <- function(puuid,
                                      api_key)
 {
   ## Variables diana (37) ---------------------------------------------------
-  wanted <- c(
+   wanted <- c(
     "puuid","gameName","tagLine","tier","leaguePoints",
     "match_id","gameDuration","championName","individualPosition",
     "champLevel","goldEarned","totalMinionsKilled",
@@ -191,8 +191,9 @@ get_match_stats_by_puuid <- function(puuid,
     "visionScore","baron_kills","dragon_kills","tower_kills",
     "herald_kills","inhibitor_kills","champion_kills","win","date",
     "longestTimeSpentLiving","timeCCingOthers","timePlayed",
-    "totalTimeCCDealt","totalTimeSpentDead",
-    "completeSupportQuestInTime","firstTurretKilledTime","mejaisFullStackInTime"
+    "totalTimeCCDealt","totalTimeSpentDead",  "neutralMinionsKilledTeamJungle",
+  "neutralMinionsKilledEnemyJungle", "totalHeal", "totalUnitsHealed", "totalShieldedOnTeammates",
+  "totalUnitsShielded", "completeSupportQuestInTime","firstTurretKilledTime","mejaisFullStackInTime"
   )
   
   ## A. lista de match-IDs --------------------------------------------------
@@ -261,6 +262,12 @@ get_match_stats_by_puuid <- function(puuid,
       timePlayed             = me$timePlayed             %||% NA_integer_,
       totalTimeCCDealt       = me$totalTimeCCDealt       %||% NA_integer_,
       totalTimeSpentDead     = me$totalTimeSpentDead     %||% NA_integer_,
+      neutralMinionsKilledTeamJungle = me$neutralMinionsKilledTeamJungle %||% NA_integer_,
+      neutralMinionsKilledEnemyJungle = me$neutralMinionsKilledEnemyJungle %||% NA_integer_,
+      totalHeal = me$totalHeal %||% NA_integer_,
+      totalUnitsHealed = me$totalUnitsHealed %||% NA_integer_,
+      totalShieldedOnTeammates = me$totalShieldedOnTeammates %||% NA_integer_,
+      totalUnitsShielded = me$totalUnitsShielded %||% NA_integer_,
       completeSupportQuestInTime = me$completeSupportQuestInTime %||% NA,
       firstTurretKilledTime      = me$firstTurretKilledTime      %||% NA,
       mejaisFullStackInTime      = me$mejaisFullStackInTime      %||% NA
