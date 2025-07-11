@@ -3,7 +3,7 @@
     "path": "~/Documents/Master/RYSE-TFM-/TFM prueba.Rmd",
     "project_path": "TFM prueba.Rmd",
     "type": "r_markdown",
-    "hash": "2323527305",
+    "hash": "0",
     "contents": "",
     "dirty": false,
     "created": 1750021933153.0,
@@ -17,11 +17,11 @@
         "scrollLine": "0"
     },
     "folds": "",
-    "lastKnownWriteTime": 1752249700,
+    "lastKnownWriteTime": 1752249965,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1752249702488,
+    "last_content_update": 1752249965,
     "read_only": false,
     "read_only_alternatives": []
 }
