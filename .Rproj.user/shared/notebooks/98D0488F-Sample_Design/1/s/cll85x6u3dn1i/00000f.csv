@@ -1,0 +1,8 @@
+"0","# Obtener lista de jugadores Grandmaster"
+"0","grandmaster_players_puuids <- get_grandmaster_players_puuids(region, queue, api_key)"
+"2","No encoding supplied: defaulting to UTF-8.
+"
+"0","# Obtener lista de jugadores Challenger"
+"0","challenger_players_puuids <- get_challenger_players_puuids(region, queue, api_key)"
+"2","No encoding supplied: defaulting to UTF-8.
+"

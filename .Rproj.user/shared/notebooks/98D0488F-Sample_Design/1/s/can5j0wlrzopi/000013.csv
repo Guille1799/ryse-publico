@@ -1,0 +1,6 @@
+"0",""
+"0","queue <- ""RANKED_SOLO_5x5"""
+"0","# Obtener lista de jugadores Master"
+"0","master_players_puuids <- get_master_players_puuids(region, queue, api_key)"
+"2","No encoding supplied: defaulting to UTF-8.
+"
