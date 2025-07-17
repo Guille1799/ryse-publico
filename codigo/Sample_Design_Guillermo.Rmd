@@ -1,0 +1,313 @@
+---
+title: "Sample_Design"
+output: html_document
+---
+
+
+```{r}
+library(httr)
+library(jsonlite)
+library(lubridate)
+library(dplyr)
+library(readr)
+
+rm(list = ls())
+
+# ---------- CONFIGURACIÓN ----------
+#CAMBIAR API KEY
+api_key <- "RGAPI-8c47ad23-08b2-4de7-863b-549b535d054d"
+routing <- "europe" #Agregar otras regiones?? 
+region <- "EUW1"
+```
+
+
+
+```{r}
+## 1. helper  ---------------------------------------------------------------
+`%||%` <- function(a,b) if (is.null(a) || length(a)==0) b else a
+
+safe_GET <- function(url, token, pause = 1.3){
+  r <- GET(url, add_headers(`X-Riot-Token` = token))
+  if (status_code(r) == 429){         # rate-limit
+    message("⏳ Rate-limit: espero 65 s…"); Sys.sleep(65)
+    r <- GET(url, add_headers(`X-Riot-Token` = token))
+  }
+  if (status_code(r) != 200) stop("HTTP ", status_code(r),
+                                  " – ", url, call. = FALSE)
+  Sys.sleep(pause)
+  r
+}
+
+## 2. función principal  ----------------------------------------------------
+get_match_stats_by_puuid <- function(puuid,
+                                     n        = 50,
+                                     queueId  = 420,
+                                     routing  = "europe",
+                                     region   = "EUW1",
+                                     api_key)
+{
+  ## Variables diana (37) ---------------------------------------------------
+  wanted <- c(
+    "puuid","gameName", "date", "datetime", "tagLine","tier","leaguePoints",
+    "match_id","gameDuration","championName","individualPosition", "champExperience",
+    "champLevel","goldEarned","totalMinionsKilled",
+    "kills","deaths","assists",
+    "totalDamageDealt","totalDamageTaken",
+    "damageDealtToBuildings","damageDealtToObjectives","damageDealtToTurrets",
+    "visionScore","baron_kills","dragon_kills","tower_kills",
+    "herald_kills","inhibitor_kills","champion_kills","win",
+    "longestTimeSpentLiving","timeCCingOthers","timePlayed",
+    "totalTimeCCDealt","totalTimeSpentDead",  "totalAllyJungleMinionsKilled",
+  "totalEnemyJungleMinionsKilled", "totalHeal", "totalHealsOnTeammates", "totalUnitsHealed", "totalDamageShieldedOnTeammates"
+  )
+  
+  ## A. lista de match-IDs --------------------------------------------------
+  list_url <- sprintf(
+    "https://%s.api.riotgames.com/lol/match/v5/matches/by-puuid/%s/ids?start=0&count=%d&queue=%d",
+    routing, puuid, n, queueId
+  )
+  ids <- safe_GET(list_url, api_key, 0) |> content("text") |> fromJSON()
+  if (length(ids) == 0) return(tibble())          # sin partidas
+  
+  ## B. rango / LP solo en Solo-Duo ----------------------------------------
+  tier_url <- sprintf(
+    "https://%s.api.riotgames.com/lol/league/v4/entries/by-puuid/%s?api_key=%s",
+    region, puuid, api_key
+  )
+  tier_dat <- safe_GET(tier_url, api_key, 0.4) |> content("text") |> fromJSON()
+  
+  tier_row <- dplyr::filter(tier_dat, queueType == "RANKED_SOLO_5x5")
+  tier         <- tier_row$tier[1]         %||% NA_character_
+  leaguePoints <- tier_row$leaguePoints[1] %||% NA_integer_
+  
+  ## C. bajar cada partida --------------------------------------------------
+  fetch_one <- function(match_id){
+    m_url <- sprintf("https://%s.api.riotgames.com/lol/match/v5/matches/%s",
+                     routing, match_id)
+    info <- safe_GET(m_url, api_key) |> content("text") |> fromJSON()
+    
+    if (info$info$queueId != queueId) return(NULL)    # por si acaso
+    
+    me <- info$info$participants |>
+          dplyr::filter(puuid == !!puuid)
+    
+    teamIdx <- which(info$info$teams$teamId == me$teamId)
+    obj     <- info$info$teams$objectives
+    
+    tibble(
+    puuid   = puuid,
+    gameName= me$riotIdGameName %||% NA_character_,
+    date    = as.Date(as_datetime(info$info$gameStartTimestamp / 1000)),
+    datetime= as_datetime(info$info$gameStartTimestamp / 1000),
+    tagLine = me$riotIdTagline  %||% NA_character_,
+    tier    = tier,
+    leaguePoints = leaguePoints,
+    match_id     = match_id,
+    gameDuration = info$info$gameDuration,
+    championName = me$championName,
+    individualPosition = me$individualPosition,
+    champExperience = me$champExperience,
+    champLevel = me$champLevel,
+    goldEarned = me$goldEarned,
+    totalMinionsKilled = me$totalMinionsKilled,
+    kills   = me$kills,
+    deaths  = me$deaths,
+    assists = me$assists,
+    totalDamageDealt = me$totalDamageDealt,
+    totalDamageTaken = me$totalDamageTaken,
+    damageDealtToBuildings   = me$damageDealtToBuildings,
+    damageDealtToObjectives  = me$damageDealtToObjectives,
+    damageDealtToTurrets     = me$damageDealtToTurrets,
+    visionScore              = me$visionScore,
+    baron_kills     = obj$baron$kills     [teamIdx] %||% NA_integer_,
+    dragon_kills    = obj$dragon$kills    [teamIdx] %||% NA_integer_,
+    tower_kills     = obj$tower$kills     [teamIdx] %||% NA_integer_,
+    herald_kills    = obj$riftHerald$kills[teamIdx] %||% NA_integer_,
+    inhibitor_kills = obj$inhibitor$kills [teamIdx] %||% NA_integer_,
+    champion_kills  = obj$champion$kills  [teamIdx] %||% NA_integer_,
+    win   = me$win,
+    longestTimeSpentLiving = me$longestTimeSpentLiving %||% NA_integer_,
+    timeCCingOthers        = me$timeCCingOthers        %||% NA_integer_,
+    timePlayed             = me$timePlayed             %||% NA_integer_,
+    totalTimeCCDealt       = me$totalTimeCCDealt       %||% NA_integer_,
+    totalTimeSpentDead     = me$totalTimeSpentDead     %||% NA_integer_,
+    
+    totalAllyJungleMinionsKilled  = me$totalAllyJungleMinionsKilled %||% NA_integer_,
+    totalEnemyJungleMinionsKilled = me$totalEnemyJungleMinionsKilled %||% NA_integer_,
+    totalHeal              = me$totalHeal              %||% NA_integer_,
+    totalHealsOnTeammates = me$totalHealsOnTeammates              %||% NA_integer_,
+    totalUnitsHealed       = me$totalUnitsHealed       %||% NA_integer_,
+    totalDamageShieldedOnTeammates = me$totalDamageShieldedOnTeammates %||% NA_integer_,
+    
+    #effectiveHealAndShielding    <- challenges$effectiveHealAndShielding %||% NA_real_,
+    #completeSupportQuestInTime   <- challenges$completeSupportQuestInTime %||% NA_integer_,
+    #firstTurretKilledTime        <- challenges$firstTurretKilledTime %||% NA_real_,
+    #mejaisFullStackInTime        <- challenges$mejaisFullStackInTime %||% NA_integer_
+  )
+  }
+  
+  out <- purrr::map(ids, fetch_one) |> purrr::compact() |> dplyr::bind_rows()
+  
+  ## D. asegurar columnas y tipos ------------------------------------------
+  missing_cols <- setdiff(wanted, names(out))
+  if (length(missing_cols) > 0){
+    out[missing_cols] <- NA
+  }
+  all_matches <- purrr::map(ids, fetch_one) |> purrr::compact() |> dplyr::bind_rows()
+
+  # Filtrar por partidas jugadas en 2025
+  matches_2025 <- all_matches %>%
+    filter(lubridate::year(datetime) == 2025)
+  
+  # Condición: al menos 50 partidas en 2025
+  if (nrow(matches_2025) < 50) {
+    message("⚠️ Menos de 50 partidas en 2025. PUUID no válido.")
+    return(tibble())
+  }
+  
+  # Tomar las últimas 50
+  matches_2025 <- matches_2025 %>%
+    arrange(desc(datetime)) %>%
+    slice(1:50)
+  
+  # Asegurar columnas y tipos
+  missing_cols <- setdiff(wanted, names(matches_2025))
+  if (length(missing_cols) > 0){
+    matches_2025[missing_cols] <- NA
+}
+
+matches_2025 <- matches_2025 %>%
+  mutate(across(where(is.logical), as.integer)) %>%
+  select(all_of(wanted))
+
+matches_2025
+
+}
+```
+
+
+```{r}
+
+high_elo_puuids <- read.csv("high_elo_puuids_euw.csv", stringsAsFactors = FALSE)
+
+# Validar y filtrar
+if (!"puuid" %in% colnames(high_elo_puuids)) {
+  stop("❌ El archivo no contiene una columna llamada 'puuid'.")
+}
+
+# Eliminar duplicados
+high_elo_puuids <- high_elo_puuids %>% distinct(puuid, .keep_all = TRUE)
+
+
+#5 60 master
+high_elo_puuids <- high_elo_puuids %>%
+  filter(tier == "Master") %>%
+  slice(1:3000)
+
+# Ver primeras filas
+head(high_elo_puuids)
+
+```
+
+```{r}
+
+
+# ──────────────────── EJEMPLO DE USO ───────────────────────────────
+mi_puuid <- high_elo_puuids$puuid[1]
+df_test <- get_match_stats_by_puuid(mi_puuid, n = 10, queueId = 420,
+                               routing = routing, region = region,
+                               api_key = api_key)
+glimpse(df_test)
+
+```
+
+```{r}
+
+# Definir cuántos PUUIDs quieres para cada tier
+target_challenger <- 0
+target_grandmaster <- 0
+target_master <- 60
+
+# Contadores de cuántos has procesado
+count_challenger <- 0
+count_grandmaster <- 0
+count_master <- 0
+
+
+
+# Ruta del archivo donde se va acumulando todo
+output_file <- "match_stats_full_guillermo.csv"
+
+# Cargar archivo si ya existe (para evitar duplicados al reiniciar)
+if (file.exists(output_file)) {
+  df_all <- read_csv(output_file, show_col_types = FALSE)
+  puuids_done <- unique(df_all$puuid)
+} else {
+  df_all <- tibble()
+  puuids_done <- character(0)
+}
+
+# Recorrer todos los puuids que no se han procesado aún
+for (i in seq_len(nrow(high_elo_puuids))) {
+  mi_puuid <- high_elo_puuids$puuid[i]
+  mi_tier  <- high_elo_puuids$tier[i]
+
+  # Saltar si ya se procesó
+  if (mi_puuid %in% puuids_done) {
+    message(sprintf("✅ PUUID %s ya procesado. Saltando...", mi_puuid))
+    next
+  }
+
+  # Verificar si ya se alcanzó el límite para este tier
+  if ((mi_tier == "Challenger" && count_challenger >= target_challenger) ||
+      (mi_tier == "Grandmaster" && count_grandmaster >= target_grandmaster) ||
+      (mi_tier == "Master" && count_master >= target_master)) {
+    next
+  }
+
+  message(sprintf("📥 Descargando datos para PUUID %s (%d/%d, tier: %s)...",
+                  mi_puuid, i, nrow(high_elo_puuids), mi_tier))
+
+  try({
+    df_puuid <- get_match_stats_by_puuid(
+      puuid    = mi_puuid,
+      n        = 50,
+      queueId  = 420,
+      routing  = routing,
+      region   = region,
+      api_key  = api_key
+    )
+
+    '# Filtrar solo partidas del año 2025
+    df_puuid <- df_puuid %>%
+      filter(lubridate::year(datetime) == 2025)'
+
+    if (nrow(df_puuid) > 0) {
+      df_all <- bind_rows(df_all, df_puuid)
+
+      # Guardar CSV
+      write_csv(df_all, output_file)
+      message(sprintf("💾 Guardado exitoso. Total acumulado: %d partidas.", nrow(df_all)))
+
+      # Actualizar contador por tier
+      if (mi_tier == "Challenger") count_challenger <- count_challenger + 1
+      if (mi_tier == "Grandmaster") count_grandmaster <- count_grandmaster + 1
+      if (mi_tier == "Master") count_master <- count_master + 1
+    } else {
+      message("⚠️ No se obtuvieron datos válidos para 2025.")
+    }
+
+    # Condición de corte global: ya tenemos todos los PUUIDs necesarios
+    if (count_challenger >= target_challenger &&
+        count_grandmaster >= target_grandmaster &&
+        count_master >= target_master) {
+      message("🏁 Objetivo alcanzado. Fin del ciclo.")
+      break
+    }
+
+    Sys.sleep(1.5)  # Control de tasa
+  }, silent = FALSE)
+}
+
+
+```
