@@ -1,8 +1,9 @@
 # Project RYSE - Elite LoL Performance Analytics
 
-Interactive R Shiny dashboard developed for a Master's thesis in Behavioral Data Science, focused on sustained competitive performance in elite League of Legends players.
+**Repository:** [github.com/Guille1799/ryse-publico](https://github.com/Guille1799/ryse-publico)  
+**Live app:** [AnalisisClusterRolyLiga](https://guillermomartindeoliva.shinyapps.io/AnalisisClusterRolyLiga/)
 
-Live app: [AnalisisClusterRolyLiga](https://guillermomartindeoliva.shinyapps.io/AnalisisClusterRolyLiga/)
+End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for an MSc in **Behavioural Data Science**. The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
 
 ## Overview
 
