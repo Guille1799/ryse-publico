@@ -1,7 +1,8 @@
 # Project RYSE - Elite LoL Performance Analytics
 
 **Repository:** [github.com/Guille1799/ryse-publico](https://github.com/Guille1799/ryse-publico)  
-**Live app:** [AnalisisClusterRolyLiga](https://guillermomartindeoliva.shinyapps.io/AnalisisClusterRolyLiga/)
+**Live app (v2, English):** [ryse-lol-v2](https://guillermomartindeoliva.shinyapps.io/ryse-lol-v2/)  
+*Revised build: interface translated to English and dashboard improvements over the original thesis submission.*
 
 End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for an MSc in **Behavioural Data Science** (group thesis, team of five; I led the technical work). The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
 
