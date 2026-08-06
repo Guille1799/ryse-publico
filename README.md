@@ -4,7 +4,7 @@
 **Live app (v2, English):** [ryse-lol-v2](https://guillermomartindeoliva.shinyapps.io/ryse-lol-v2/)  
 *Revised build: interface translated to English and dashboard improvements over the original thesis submission.*
 
-End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for an MSc in **Behavioural Data Science** (group thesis, team of five; I led the technical work). The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
+End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for a postgraduate master's in **Behavioural Data Science** (group thesis, team of five; I led the technical work). The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
 
 ## Overview
 
@@ -94,7 +94,7 @@ shiny::runApp("app.R")
 
 ## Authorship
 
-This was a **group MSc thesis — a team of five**. I led the technical side: the data pipeline
+This was a **group postgraduate master's thesis — a team of five**. I led the technical side: the data pipeline
 (ETL and de-duplication), the clustering and modelling, and the Shiny dashboard. The rest of the
 team covered the research framing and the written report. See the *Contributors* tab for everyone
 who committed to this repository.
