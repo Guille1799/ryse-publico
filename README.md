@@ -3,7 +3,7 @@
 **Repository:** [github.com/Guille1799/ryse-publico](https://github.com/Guille1799/ryse-publico)  
 **Live app:** [AnalisisClusterRolyLiga](https://guillermomartindeoliva.shinyapps.io/AnalisisClusterRolyLiga/)
 
-End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for an MSc in **Behavioural Data Science**. The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
+End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for an MSc in **Behavioural Data Science** (group thesis, team of five; I led the technical work). The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
 
 ## Overview
 
@@ -91,7 +91,12 @@ shiny::runApp("app.R")
 - This public repository is focused on reproducible analysis and portfolio presentation.
 - Some early-stage artifacts and private planning materials are intentionally excluded.
 
-## Author
+## Authorship
 
-Guillermo Martin de Oliva Carranza  
-LinkedIn: [guillermo-martin-de-oliva-carranza](https://www.linkedin.com/in/guillermo-martin-de-oliva-carranza-58391817a/)
+This was a **group MSc thesis — a team of five**. I led the technical side: the data pipeline
+(ETL and de-duplication), the clustering and modelling, and the Shiny dashboard. The rest of the
+team covered the research framing and the written report. See the *Contributors* tab for everyone
+who committed to this repository.
+
+Guillermo Martín de Oliva  
+LinkedIn: [guillermo-martin-de-oliva](https://www.linkedin.com/in/guillermo-martin-de-oliva/)
