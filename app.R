@@ -20,7 +20,7 @@ kpi_names_promedio <- list( "kda_promedio" = "KDA Promedio", "gpm_promedio" = "G
 cluster_descriptions_list <- list("TOP" = list("1" = "Agresivos de Combate", "2" = "De Utilidad y Control", "3" = "Enfocados a Objetivos"), "JUNGLE" = list("1" = "De Utilidad y Control de Mapa", "2" = "De Alto Impacto Económico (Carry)", "3" = "Agresivos de Combate (Gank-heavy)"), "MIDDLE" = list("1" = "Magos de Control y Asedio", "2" = "Asesinos y Roamers", "3" = "De Alto Impacto en Teamfights"), "BOTTOM" = list("1" = "Hypercarries de Juego Tardío", "2" = "Agresivos y de Dominancia en Línea", "3" = "De Utilidad y Apoyo"), "UTILITY" = list("1" = "De Control de Visión y 'Peel'", "2" = "Agresivos de 'Engage'", "3" = "Pasivos o de bajo impacto"))
 
 # Cargamos la base de datos.
-datos_raw <- read_csv("ryse_database.csv")
+datos_raw <- read_csv("data/ryse_database.csv")
 
 # Hacemos una limpieza inicial y calculamos el OCI.
 df_limpio <- datos_raw %>%

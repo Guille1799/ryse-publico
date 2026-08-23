@@ -79,13 +79,19 @@ The app includes multiple analysis tabs such as:
 
 ## Run locally
 
-1) Open the project in RStudio.  
-2) Install required packages (if missing).  
-3) Run:
+From the repository root (the app reads `data/ryse_database.csv` relative to it):
 
 ```r
+install.packages(c(
+  "shiny", "tidyverse", "janitor", "DT", "scales", "htmltools", "markdown",
+  "cluster", "ranger", "pROC", "ggcorrplot", "iml", "pdp"
+))
+
 shiny::runApp("app.R")
 ```
+
+Package versions are **not** pinned — there is no `renv.lock` in this repository, so a fresh
+install takes whatever CRAN currently serves. The live app linked above is the reference build.
 
 ## Notes
 
