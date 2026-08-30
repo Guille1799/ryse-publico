@@ -9,7 +9,9 @@
 > newer codebase that is not in this repository, so cloning and running this repo will not
 > reproduce what the link shows.
 
-End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for a postgraduate master's in **Behavioural Data Science** (group thesis, team of five; I led the technical work). The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
+End-to-end **R** analytics: ETL, clustering, supervised learning and a **Shiny** dashboard. Built for a postgraduate master's in **Behavioural Data Science**. It was a group thesis of five people, and I led the technical work.
+
+The domain is **elite League of Legends** performance. The methods are not: find heterogeneous groups, model an outcome, then check what the model actually learned. Averages hide who needs different support, so the same three steps carry over to behavioural and social-impact work.
 
 ## Overview
 
@@ -45,7 +47,7 @@ The project combines:
 - Modeling and analysis:
   - K-Means clustering (role-wise profiles)
   - Random Forest for key victory factors
-  - ALE/PDP-based interpretability workflow
+  - ALE plots for interpretability (the app explains why PDPs mislead when KPIs are correlated)
   - consistency metrics (coefficient of variation)
 
 ## Dashboard sections
@@ -68,7 +70,7 @@ The app includes multiple analysis tabs such as:
 - cluster
 - pROC
 - ggcorrplot
-- iml / pdp
+- iml
 
 ## Repository structure
 
@@ -86,8 +88,8 @@ From the repository root (the app reads `data/ryse_database.csv` relative to it)
 
 ```r
 install.packages(c(
-  "shiny", "tidyverse", "janitor", "DT", "scales", "htmltools", "markdown",
-  "cluster", "ranger", "pROC", "ggcorrplot", "iml", "pdp"
+  "shiny", "tidyverse", "janitor", "scales", "htmltools",
+  "ranger", "pROC", "ggcorrplot", "iml"
 ))
 
 shiny::runApp("app.R")
@@ -98,8 +100,9 @@ install takes whatever CRAN currently serves.
 
 ## Notes
 
-- This public repository is focused on reproducible analysis and portfolio presentation.
-- Some early-stage artifacts and private planning materials are intentionally excluded.
+- This public repository is focused on analysis and portfolio presentation.
+- `HEAD` no longer tracks the early-stage artifacts, the RStudio caches or the thesis PDF. Git history still holds them. A full clone therefore downloads about 20 MB, not the 4 MB the current files weigh.
+- `git clone --depth 1` skips that history if you only want the code and the dataset.
 
 ## Authorship
 

@@ -6,18 +6,18 @@ library(scales)
 library(htmltools)
 library(ggcorrplot)
 library(ranger)
-library(markdown)
-library(DT)
-library(pdp)
 library(iml)
-library(cluster)
 library(pROC)
 
 # --- 2. Preparación de Datos y Nombres ---
 kpi_names_full <- list( "win" = "Tasa de Victorias (win)", "gpm" = "Oro por Minuto (gpm)", "kda_ajustado" = "KDA (kda_ajustado)", "cs_pm" = "Súbditos por Minuto (cs_pm)", "vision_pm" = "Visión por Minuto (vision_pm)", "damage_dealt_to_objectives" = "Daño a Objetivos (damage_dealt_to_objectives)", "oci" = "Índice de Control de Objetivos (oci)" )
-kpi_names_promedio <- list( "kda_promedio" = "KDA Promedio", "gpm_promedio" = "GPM Promedio", "vision_score_promedio" = "Visión Promedio", "cc_dealt_promedio" = "CC Infligido Promedio", "objetivos_promedio" = "Daño a Objetivos Promedio", "inhib_kills_promedio" = "Inhibidores Destruidos Promedio", "oci_promedio" = "OCI Promedio", "partidas_jugadas" = "Partidas Jugadas" )
+kpi_names_promedio <- list( "kda_promedio" = "KDA Promedio", "gpm_promedio" = "GPM Promedio", "vision_score_promedio" = "Visión Promedio", "cc_dealt_promedio" = "CC Infligido Promedio", "objetivos_promedio" = "Daño a Estructuras Promedio", "inhib_kills_promedio" = "Inhibidores Destruidos Promedio", "oci_promedio" = "OCI Promedio", "partidas_jugadas" = "Partidas Jugadas" )
 
 cluster_descriptions_list <- list("TOP" = list("1" = "Agresivos de Combate", "2" = "De Utilidad y Control", "3" = "Enfocados a Objetivos"), "JUNGLE" = list("1" = "De Utilidad y Control de Mapa", "2" = "De Alto Impacto Económico (Carry)", "3" = "Agresivos de Combate (Gank-heavy)"), "MIDDLE" = list("1" = "Magos de Control y Asedio", "2" = "Asesinos y Roamers", "3" = "De Alto Impacto en Teamfights"), "BOTTOM" = list("1" = "Hypercarries de Juego Tardío", "2" = "Agresivos y de Dominancia en Línea", "3" = "De Utilidad y Apoyo"), "UTILITY" = list("1" = "De Control de Visión y 'Peel'", "2" = "Agresivos de 'Engage'", "3" = "Pasivos o de bajo impacto"))
+
+# Semilla del Random Forest. Sin ella, ranger() remuestrea distinto en cada corrida.
+# El AUC, el error OOB, la importancia y el ALE cambiaban en cada clic.
+SEMILLA_RF <- 123
 
 # Cargamos la base de datos.
 datos_raw <- read_csv("data/ryse_database.csv")
@@ -121,8 +121,8 @@ ui <- fluidPage(
                  h4("Análisis de Impacto (Gráfico ALE)"),
                  p("Selecciona una de las variables más importantes para visualizar cómo afecta directamente a la probabilidad de victoria."),
                  uiOutput("ale_explanation_ui"),
-                 uiOutput("pdp_selector_ui"),
-                 plotOutput("pdp_plot")
+                 uiOutput("ale_selector_ui"),
+                 plotOutput("ale_plot")
         ),
         tabPanel("Consistencia del Jugador", br(),
                  uiOutput("consistency_explanation_ui"),
@@ -223,7 +223,8 @@ server <- function(input, output, session) {
     modelo_inicial <- ranger(
       formula = win ~ .,
       data = datos_iniciales %>% select(-tier, -individual_position, -puuid, -match_id, -display_name),
-      importance = "impurity", probability = TRUE, num.trees = 300, keep.inbag = TRUE
+      importance = "impurity", probability = TRUE, num.trees = 300, keep.inbag = TRUE,
+      seed = SEMILLA_RF
     )
     modelo_rf_reactivo(modelo_inicial)
     datos_modelo_reactivo(datos_iniciales)
@@ -236,7 +237,8 @@ server <- function(input, output, session) {
     modelo_nuevo <- ranger(
       formula = win ~ .,
       data = datos_para_modelo %>% select(-tier, -individual_position, -puuid, -match_id, -display_name),
-      importance = "impurity", probability = TRUE, num.trees = 300, keep.inbag = TRUE
+      importance = "impurity", probability = TRUE, num.trees = 300, keep.inbag = TRUE,
+      seed = SEMILLA_RF
     )
     modelo_rf_reactivo(modelo_nuevo)
     datos_modelo_reactivo(datos_para_modelo)
@@ -324,21 +326,24 @@ server <- function(input, output, session) {
   
   output$guia_ui <- renderUI({
     tags$div(
-      tags$h3(tags$b("Guía del Proyecto RYSE: Rendimiento y Salud en esports")),
-      tags$p("Esta herramienta interactiva es un componente clave del ", tags$b("Trabajo de Fin de Máster 'Proyecto Rendimiento y Salud en esports (RYSE)'"), ", cuyo objetivo principal fue analizar el rendimiento competitivo de jugadores de alto nivel en ", tags$i("League of Legends"), ". El proyecto se enmarcó en el modelo de minería de datos ", tags$b("CRISP-DM"), ", el cual nos permitió abordar de forma sistemática el análisis, desde la comprensión del problema hasta la implementación de este dashboard. Hemos trabajado con datos públicos de jugadores de los rangos Maestro, Gran Maestro y Challenger, extraídos directamente de la API oficial de Riot Games."),
+      tags$h3(tags$b("Guía del Proyecto RYSE: rendimiento competitivo en esports")),
+      tags$p("Esta herramienta es el componente práctico del ", tags$b("Trabajo de Fin de Máster 'Proyecto Rendimiento y Salud en esports (RYSE)'"), ". Analiza el rendimiento de jugadores de alto nivel en ", tags$i("League of Legends"), "."),
+      tags$p("El proyecto siguió el modelo de minería de datos ", tags$b("CRISP-DM"), ". Es un guion por etapas, de la comprensión del problema hasta el dashboard. Sirve para que cada decisión quede en su sitio y se pueda revisar."),
+      tags$p("Los datos son públicos. Vienen de la API oficial de Riot Games y cubren los rangos Maestro, Gran Maestro y Challenger."),
+      tags$p(tags$b("La S de RYSE es Salud, y este dashboard no la mide."), " Esta base no trae datos de bienestar. La Salud sigue siendo una línea futura, y así aparece en el apartado 4."),
       tags$hr(),
       tags$h4(tags$b("1. Guía de Uso del Dashboard")),
-      tags$p("Para explorar los hallazgos del proyecto, recomendamos seguir estos pasos:"),
+      tags$p("Para explorar los hallazgos, sigue estos pasos:"),
       tags$ul(
-        tags$li(tags$b("Filtros Principales:"), " En la barra lateral, comiencen seleccionando un rol específico. Esto activará el análisis de perfiles y los análisis contextualizados de las siguientes pestañas. También pueden filtrar por rango para ver las particularidades de cada liga."),
+        tags$li(tags$b("Filtros Principales:"), " En la barra lateral, empieza por un rol concreto. Eso activa el análisis de perfiles y los análisis contextualizados de las demás pestañas. El filtro de rango acota los datos a una sola liga."),
         tags$li(tags$b("Visión General:"), " Aquí se presenta un resumen de los indicadores clave de rendimiento (KPIs) para la selección de filtros actual."),
-        tags$li(tags$b("Perfiles de Jugador (Clustering):"), " En esta pestaña, el dashboard les mostrará automáticamente los arquetipos de jugador identificados para el rol seleccionado. El análisis de concentración les permitirá ver si algún perfil es más popular en una liga de lo que se esperaría."),
-        tags$li(tags$b("Análisis por Perfil:"), " Comparen directamente las estadísticas de cada arquetipo para entender sus fortalezas, debilidades y el impacto que tienen en el juego."),
-        tags$li(tags$b("Perfil Ideal por Rol y Rango:"), " Esta es una de las funciones más avanzadas. Tras seleccionar un rango, la herramienta calculará un 'Índice de Idoneidad' personalizado para identificar qué perfil de jugador es el más robusto y efectivo para conseguir la victoria."),
+        tags$li(tags$b("Perfiles de Jugador (Clustering):"), " Muestra los arquetipos de jugador del rol seleccionado. El análisis de concentración marca si un perfil aparece en una liga más de lo esperado."),
+        tags$li(tags$b("Análisis por Perfil:"), " Compara las estadísticas medias de cada arquetipo. Sirve para ver en qué es fuerte cada uno y en qué no."),
+        tags$li(tags$b("Perfil Ideal por Rol y Rango:"), " Tras seleccionar un rango, la herramienta calcula un 'Índice de Idoneidad' propio y ordena los perfiles por él. Aviso: la popularidad del perfil es uno de los cuatro ingredientes del índice y pesa un 10 %. El índice no es independiente del meta."),
         tags$li(tags$b("Análisis de Correlaciones:"), " Explora la relación entre las métricas de rendimiento y cómo se interrelacionan."),
         tags$li(tags$b("Factores Clave de Victoria:"), " Al hacer clic en 'Ejecutar Análisis', un modelo de ", tags$i("Machine Learning"), " se entrenará para identificar cuáles de los KPIs tienen mayor importancia predictiva para la victoria. El análisis de impacto muestra la relación real entre cada métrica y el éxito en la partida."),
         tags$li(tags$b("Consistencia del Jugador:"), " Analiza si la regularidad en el rendimiento de un jugador está ligada a un mayor éxito competitivo."),
-        tags$li(tags$b("Informe Ejecutivo:"), " Este módulo genera un resumen redactado con los hallazgos más importantes de su análisis, comparando el perfil más popular con el estadísticamente más efectivo."),
+        tags$li(tags$b("Informe Ejecutivo:"), " Genera un resumen redactado de la selección actual. Compara el perfil más concentrado con el que más puntúa en el Índice de Idoneidad."),
         tags$li(tags$b("Análisis Jugador:"), " Una pestaña diseñada para el estudio de caso individualizado (jugadores con 30 o más partidas). Permite diagnosticar el arquetipo funcional y las métricas de un jugador específico.")
       ),
       tags$hr(),
@@ -349,11 +354,11 @@ server <- function(input, output, session) {
         tags$li(tags$b("KDA Ajustado:"), " Mide el rendimiento en combate con la fórmula ", tags$code("(Kills + Assists) / pmax(1, deaths)"), ". Se usa ", tags$code("pmax(1, deaths)"), " para evitar la división por cero sin penalizar a los jugadores con 0 muertes."),
         tags$li(tags$b("Súbditos por Minuto (CS/min):"), " Mide la eficiencia en la acumulación de recursos y experiencia a través de la eliminación de súbditos."),
         tags$li(tags$b("Visión por Minuto:"), " Refleja la capacidad del jugador para controlar el mapa y proporcionar información estratégica al equipo."),
-        tags$li(tags$b("Índice de Control de Objetivos (OCI v3.0):"), " Métrica personalizada que pondera la participación en la destrucción de torres, dragones e inhibidores. Los pesos proceden de un GLM normalizado. Lasso descartó barones y heraldos, y en Random Forest y XGBoost pesan poco. Fórmula: ", tags$code("OCI = (0.476 * Torres) + (0.397 * Dragones) + (0.127 * Inhibidores)")),
-        tags$li(tags$b("Coeficiente de Variación (CV):"), " Mide la irregularidad o volatilidad del rendimiento de un jugador. ", tags$code("CV = desviación típica / media"), ". Un CV bajo indica alta consistencia. Es la métrica clave para el componente 'Salud'."),
+        tags$li(tags$b("Índice de Control de Objetivos (OCI v3.0):"), " Métrica propia. Pondera la participación en torres, dragones e inhibidores. Los tres pesos se fijaron en el TFM. El código que los seleccionó no está en este repositorio, así que aquí no se pueden reproducir. Fórmula: ", tags$code("OCI = (0.476 * Torres) + (0.397 * Dragones) + (0.127 * Inhibidores)")),
+        tags$li(tags$b("Coeficiente de Variación (CV):"), " Mide la irregularidad del rendimiento de un jugador. ", tags$code("CV = desviación típica / media"), ". Un CV bajo indica alta consistencia. El TFM lo propuso como puente hacia el componente Salud. Ese cruce no está hecho: aquí el CV solo mide regularidad."),
         tags$li(tags$b("Perfil / Clúster:"), " Grupo de jugadores con un estilo de juego similar, identificado automáticamente por el algoritmo de K-Means. El número de perfiles está fijado en tres por rol. Es una decisión de interpretabilidad: tres arquetipos se pueden describir y comparar. No sale de un criterio estadístico automático."),
         tags$li(tags$b("Índice de Concentración:"), " Mide si un perfil es más o menos común en una liga que lo esperado por azar (un valor > 1 indica sobrerrepresentación)."),
-        tags$li(tags$b("Gráfico de Efectos Locales Acumulados (ALE):"), " Muestra el impacto real de una única variable sobre la probabilidad de victoria. A diferencia de otros métodos como los PDP, los gráficos ALE son robustos ante variables correlacionadas (multicolinealidad) ya que calculan el efecto analizando únicamente combinaciones de datos que ocurren en la realidad. Esto evita distorsiones y ofrece una interpretación más fiable.",
+        tags$li(tags$b("Gráfico de Efectos Locales Acumulados (ALE):"), " Muestra el efecto de una sola variable sobre la probabilidad de victoria. Aquí muchas métricas suben y bajan juntas. Un PDP inventa jugadores imposibles para separarlas, y por eso engaña. El ALE solo usa combinaciones que aparecen en los datos reales, así que su curva se lee directamente.",
                 tags$ul(
                   tags$li(tags$b("La 'Alfombra de Datos' (Rug Plot):"), " La serie de pequeñas líneas verticales en la parte inferior del gráfico ALE se conoce como 'rug plot'. Cada línea representa partidas reales de la base de datos, mostrando la distribución de los datos. Las zonas más densas u oscuras indican dónde el modelo tiene más información para aprender, haciendo que la curva en esa área sea más fiable.")
                 )
@@ -362,13 +367,15 @@ server <- function(input, output, session) {
       tags$hr(),
       tags$h4(tags$b("3. Metodología del Dashboard")),
       tags$ul(
-        tags$li(tags$b("Baremo por Percentiles (P-Score) en Índice de Idoneidad:"), " Hemos abandonado el sistema de puntos fijos. La puntuación de Rendimiento, Consistencia, Métrica Clave y Popularidad se calcula ahora mediante un sistema de percentiles (P-Score de 0 a 100). Esto compara el rendimiento de un perfil directamente con todos los demás perfiles de su rol/rango, elevando la precisión y la validez prescriptiva."),
+        tags$li(tags$b("Baremo por Percentiles (P-Score) en Índice de Idoneidad:"), " Rendimiento, Consistencia, Métrica Clave y Popularidad se puntúan por percentiles (P-Score de 0 a 100). Cada perfil se compara con los demás jugadores de su rol y rango. Así una puntuación alta significa lo mismo en todos los roles."),
         tags$li(tags$b("Ponderación Dinámica por Rol:"), " El Índice de Idoneidad aplica pesos estratégicos que varían según el rol para reflejar la prioridad de juego: ", tags$br(),tags$ul(tags$li(tags$b("Roles CARRY (Middle, Bottom):"), " [Rendimiento: 50%], [Métrica Clave: 20%], [Consistencia: 20%], [Popularidad: 10%]"), tags$li(tags$b("Roles UTILIDAD (Jungle, Utility):"), " [Métrica Clave: 40%], [Consistencia: 30%], [Rendimiento: 20%], [Popularidad: 10%]"), tags$li(tags$b("Rol HÍBRIDO (Top):"), " [Rendimiento: 40%], [Métrica Clave: 25%], [Consistencia: 25%], [Popularidad: 10%]"))
         )
       ),
       tags$hr(),
       tags$h4(tags$b("4. Futuras Líneas de Investigación")),
-      tags$p("El trabajo de escalabilidad propone el ", tags$b("Análisis de Sinergia de Composiciones de Equipo"), ", utilizando el ", tags$code("match_id"), " para pasar de la unidad individual (el jugador y su perfil) a la unidad colectiva (la combinación de 5 perfiles) para identificar sinergias de victoria. También se propone la ", tags$b("Optimización Empírica de Fórmulas"), " (Grid Search) y la ", tags$b("Integración del Componente Salud (S de RYSE)"), " cruzando la Consistencia (CV) con datos de bienestar.")
+      tags$p("Queda pendiente el ", tags$b("Análisis de Sinergia de Composiciones de Equipo"), ". Usaría el ", tags$code("match_id"), " para pasar del jugador suelto a la combinación de cinco perfiles."),
+      tags$p("Queda pendiente la ", tags$b("Integración del Componente Salud (la S de RYSE)"), ". Exige cruzar la Consistencia (CV) con datos de bienestar del jugador, y esos datos no están en esta base."),
+      tags$p("La ", tags$b("Optimización Empírica de Fórmulas"), " (Grid Search) ya no es una línea futura. Se hizo después de este dashboard y sus fórmulas finales las usa la versión 2, enlazada arriba. El código de esa optimización no está en este repositorio.")
     )
   })
   
@@ -563,7 +570,7 @@ server <- function(input, output, session) {
     
     tags$div(
       tags$h3(paste("Perfil Ideal por Rol para el Rango:", rango_seleccionado)),
-      tags$p("Esta alineación se basa en un 'Índice de Idoneidad' multicriterio que evalúa los perfiles de cada rol."),
+      tags$p("Esta alineación sale del 'Índice de Idoneidad', una puntuación propia que ordena los perfiles de cada rol."),
       tags$hr(),
       tags$ul(
         tags$li(tags$strong("TOP: "), ideal_team[["TOP"]]),
@@ -574,10 +581,11 @@ server <- function(input, output, session) {
       ),
       tags$hr(),
       tags$h4("¿Cómo se ha calculado esto? La Metodología del 'Índice de Idoneidad' con Baremo por Percentiles (P-Score)"),
-      tags$p("Para asegurar una selección robusta y precisa, el perfil ideal se elige mediante un índice compuesto que evalúa cada perfil en cuatro áreas clave. Todos los cálculos se realizan de forma contextual, usando solo datos del rango seleccionado."),
+      tags$p("El perfil ideal sale de un índice compuesto. Evalúa cada perfil en cuatro áreas y usa solo datos del rango seleccionado."),
+      tags$p(tags$b("Aviso:"), " una de esas cuatro áreas es la popularidad del perfil, y pesa un 10 %. Por eso este índice no prueba que el perfil ganador sea mejor que el popular: el ingrediente y la conclusión se tocan."),
       tags$ul(
         tags$li(tags$strong("1. Criterios de Evaluación:"), " Se miden 4 áreas: Rendimiento (Winrate), Consistencia (inverso del CV de KDA), Popularidad (Índice de Concentración) y Dominancia en una Métrica Clave para el rol (ej. OCI para Jungla)."),
-        tags$li(tags$strong("2. Sistema de Puntuación (P-Score):"), " Se abandona el sistema de puntos fijos. Ahora, para cada criterio, el rendimiento promedio de un perfil se compara con la distribución de todos los jugadores de ese rol/rango para obtener su percentil (P-Score de 0 a 100). Esto proporciona una puntuación única y granular."),
+        tags$li(tags$strong("2. Sistema de Puntuación (P-Score):"), " Para cada criterio, el promedio del perfil se compara con la distribución de todos los jugadores de ese rol y rango. De ahí sale su percentil (P-Score de 0 a 100). El percentil hace comparables criterios con unidades distintas."),
         tags$li(tags$strong("3. Ponderación Dinámica por Rol:"), " Los 4 P-Scores se combinan usando pesos diferentes según el arquetipo de cada rol, para reflejar qué es más importante para cada posición:")
       ),
       tags$ul(
@@ -585,7 +593,7 @@ server <- function(input, output, session) {
         tags$li(tags$b("Roles UTILIDAD (Jungle, Utility):"), " [Métrica Clave: 40%], [Consistencia: 30%], [Rendimiento: 20%], [Popularidad: 10%]"),
         tags$li(tags$b("Rol HÍBRIDO (Top):"), " [Rendimiento: 40%], [Métrica Clave: 25%], [Consistencia: 25%], [Popularidad: 10%]")
       ),
-      tags$p(tags$b("El perfil con la puntuación final más alta en este 'Índice de Idoneidad' es el seleccionado como ideal."))
+      tags$p(tags$b("El perfil con la puntuación más alta en el 'Índice de Idoneidad' es el que se marca como ideal."), " Es un ranking, no un contraste. Ninguna de las diferencias que verás lleva p-valor ni intervalo.")
     )
   })
   
@@ -634,7 +642,7 @@ server <- function(input, output, session) {
       tags$p(tags$strong("Métricas de Rendimiento del Modelo (Random Forest):")),
       tags$ul(
         tags$li(tags$b("AUC (Área bajo la Curva ROC):"), tags$span(style="color:blue; font-weight:bold;", auc_valor), " - (Calculado con OOB) Separa victorias de derrotas; 1.0 es el máximo. ", tags$b("Aviso:"), " todas las variables se miden en la misma partida que el resultado. Para ganar hay que destruir inhibidores. Ese dato forma parte del resultado, no es una señal previa. Este AUC mide asociación con el desenlace, no capacidad de predecirlo por adelantado."),
-        tags$li(tags$b("Error de Predicción:"), tags$span(style="color:red; font-weight:bold;", error_tag), " - Porcentaje de predicciones incorrectas sobre nuevos datos. Más bajo es mejor.")
+        tags$li(tags$b("Error de Predicción:"), tags$span(style="color:red; font-weight:bold;", error_tag), " - Porcentaje de predicciones incorrectas (OOB). Cada árbol deja fuera una parte de la muestra y se le pregunta solo por esa parte. Son partidas de la misma muestra, no datos nuevos. Más bajo es mejor.")
       ),
       tags$hr(),
       
@@ -669,19 +677,19 @@ server <- function(input, output, session) {
     )
   })
   
-  output$pdp_selector_ui <- renderUI({
+  output$ale_selector_ui <- renderUI({
     modelo <- modelo_rf_reactivo()
     validate(need(!is.null(modelo), ""))
     top_vars_raw <- names(sort(modelo$variable.importance, decreasing = TRUE))[1:3]
-    selectInput("pdp_variable_selector", "Selecciona una variable para analizar su impacto:",
+    selectInput("ale_variable_selector", "Selecciona una variable para analizar su impacto:",
                 choices = setNames(top_vars_raw, kpi_names_full[top_vars_raw]))
   })
   
-  output$pdp_plot <- renderPlot({
+  output$ale_plot <- renderPlot({
     modelo <- modelo_rf_reactivo()
     datos_para_iml <- datos_modelo_reactivo()
     validate(need(!is.null(modelo) && !is.null(datos_para_iml), ""))
-    validate(need(!is.null(input$pdp_variable_selector), "Seleccionando variable..."))
+    validate(need(!is.null(input$ale_variable_selector), "Seleccionando variable..."))
     
     X <- datos_para_iml %>% select(all_of(modelo$forest$independent.variable.names))
     y <- datos_para_iml$win
@@ -692,14 +700,14 @@ server <- function(input, output, session) {
     
     predictor <- Predictor$new(model = modelo, data = X, y = y, predict.fun = pred_func)
     
-    ale_effect <- FeatureEffect$new(predictor = predictor, feature = input$pdp_variable_selector, method = "ale")
+    ale_effect <- FeatureEffect$new(predictor = predictor, feature = input$ale_variable_selector, method = "ale")
     
     plot(ale_effect) +
       scale_y_continuous(name = "Efecto sobre la Probabilidad de Victoria", labels = scales::percent_format(accuracy = 1)) +
       labs(
-        title = paste("Impacto de", kpi_names_full[[input$pdp_variable_selector]], "en la Victoria (Gráfico ALE)"),
+        title = paste("Impacto de", kpi_names_full[[input$ale_variable_selector]], "en la Victoria (Gráfico ALE)"),
         subtitle = "El gráfico muestra el cambio en la probabilidad de victoria respecto a la media.",
-        x = kpi_names_full[[input$pdp_variable_selector]]
+        x = kpi_names_full[[input$ale_variable_selector]]
       ) +
       theme_minimal(base_size = 14)
   })
@@ -723,10 +731,10 @@ server <- function(input, output, session) {
   })
   
   output$consistency_plot <- renderPlot({
-    validate(need(nrow(datos_consistencia()) > 10, "No hay suficientes jugadores con más de 10 partidas para los filtros seleccionados."))
+    validate(need(nrow(datos_consistencia()) > 10, "No hay suficientes jugadores con 10 o más partidas para los filtros seleccionados."))
     consistency_kpi_labels <- c("gpm_cv" = "GPM (gpm)", "kda_cv" = "KDA (kda_ajustado)", "cs_cv" = "CS/min (cs_pm)")
     selected_kpi_label <- consistency_kpi_labels[input$consistency_kpi]
-    ggplot(datos_consistencia(), aes_string(x = input$consistency_kpi, y = "winrate")) +
+    ggplot(datos_consistencia(), aes(x = .data[[input$consistency_kpi]], y = winrate)) +
       geom_point(alpha = 0.5, color = "darkblue") +
       geom_smooth(method = "lm", color = "red", se = FALSE) +
       scale_y_continuous(labels = percent_format()) +
@@ -748,13 +756,13 @@ server <- function(input, output, session) {
     conclusion_html <- if (perfil_popular_data$cluster == perfil_ideal_data$cluster) {
       tags$div(
         tags$h4("Conclusión: Metajuego Optimizado"),
-        tags$p("El análisis revela que el perfil más popular (el 'meta') coincide con el perfil estadísticamente más efectivo según el 'Índice de Idoneidad'. Esto sugiere que la comunidad de jugadores de este nivel ha identificado y adoptado correctamente el arquetipo de juego más óptimo para este rol y rango.")
+        tags$p("El perfil más concentrado es también el que más puntúa en el Índice de Idoneidad. En este rol y rango, meta e índice coinciden. Ten en cuenta que la popularidad entra en el índice con un 10 %, así que la coincidencia está en parte forzada por su construcción.")
       )
     } else {
       tags$div(
         tags$h4("Conclusión: Posible Ineficiencia en el Metajuego"),
-        tags$p("Se ha detectado una discrepancia clave: el perfil más popular no es el que nuestro análisis multicriterio identifica como el más efectivo. Mientras que el 'meta' se inclina por el perfil de ", tags$b(paste0("'", nombre_perfil_popular, "'")), ", los datos sugieren que el arquetipo de ", tags$b(paste0("'", nombre_perfil_ideal, "'")), " es estadísticamente superior en su contribución a la victoria."),
-        tags$p("Este hallazgo sugiere una posible ineficiencia en el metajuego actual, presentando una oportunidad estratégica para aquellos jugadores que adopten el perfil óptimo pero menos popular.")
+        tags$p("El perfil más concentrado no es el que más puntúa en el Índice de Idoneidad. El 'meta' se inclina por el perfil de ", tags$b(paste0("'", nombre_perfil_popular, "'")), ", y el índice coloca por delante al de ", tags$b(paste0("'", nombre_perfil_ideal, "'")), ". Detrás de esa ordenación no hay ningún contraste estadístico: es una suma ponderada de cuatro percentiles."),
+        tags$p("Esa diferencia apunta a una posible ineficiencia del metajuego. Antes de darla por buena, mira los pesos: la popularidad entra en el índice con un 10 %. 'Popular' y 'ganador según el índice' no son dos medidas independientes.")
       )
     }
     
@@ -765,7 +773,7 @@ server <- function(input, output, session) {
       tags$p("Para el rol de ", tags$b(input$rol_selector), ", el arquetipo de jugador con mayor concentración en el rango ", tags$b(input$tier_selector), " es el perfil de ", tags$b(paste0("'", nombre_perfil_popular, "' (Perfil ", perfil_popular_data$cluster, ")."))),
       tags$br(),
       tags$h4("2. El Óptimo: ¿Qué Perfil es el Más Efectivo?"),
-      tags$p("Tras aplicar el 'Índice de Idoneidad' con P-Score, que pondera el rendimiento, la consistencia y el dominio de métricas clave, el análisis identifica al perfil de ", tags$b(paste0("'", nombre_perfil_ideal, "' (Perfil ", perfil_ideal_data$cluster, ")")), " como el más robusto y efectivo para conseguir la victoria."),
+      tags$p("Tras aplicar el 'Índice de Idoneidad' con P-Score, que pondera el rendimiento, la consistencia y el dominio de métricas clave, el análisis identifica al perfil de ", tags$b(paste0("'", nombre_perfil_ideal, "' (Perfil ", perfil_ideal_data$cluster, ")")), " como el de puntuación más alta. Es un ranking del índice, no un contraste estadístico."),
       tags$br(),
       conclusion_html
     )
@@ -779,10 +787,12 @@ server <- function(input, output, session) {
       tags$p("El principal descubrimiento del proyecto es la confirmación empírica de que no existe un único camino hacia el alto rendimiento. Mediante clustering K-Means, hemos identificado y validado la existencia de, al menos, ", tags$b("3 arquetipos de jugador (perfiles) distintos y medibles para cada uno de los 5 roles."), " Este hallazgo refuta la idea de un 'estilo de juego óptimo' universal, demostrando que el éxito en el ELO alto se sustenta en la especialización en diferentes estrategias funcionales, desde 'hypercarries' de alto impacto económico hasta jugadores de control y utilidad."),
       tags$hr(),
       tags$h4("2. El 'Metajuego' Popular No Siempre es el Estadísticamente Más Efectivo"),
-      tags$p("Nuestro 'Índice de Idoneidad' —una métrica multicriterio que pondera rendimiento, consistencia, popularidad y dominio de métricas clave— revela discrepancias significativas entre el perfil más jugado (el 'meta') y el más efectivo. Por ejemplo, para el rol de ", tags$b("TOP en Master,"), " a pesar de que el perfil más popular es el ", tags$b("'Agresivos de Combate'"), ", nuestro análisis identifica al arquetipo ", tags$b("'Enfocados a Objetivos'"), " como el estadísticamente superior para conseguir la victoria. Este tipo de ineficiencias en el metajuego representan oportunidades estratégicas que pueden ser explotadas por jugadores y equipos para obtener una ventaja competitiva."),
+      tags$p("Nuestro 'Índice de Idoneidad' —una métrica multicriterio que pondera rendimiento, consistencia, popularidad y dominio de métricas clave— revela discrepancias significativas entre el perfil más jugado (el 'meta') y el más efectivo. Por ejemplo, para el rol de ", tags$b("TOP en Master,"), " a pesar de que el perfil más popular es el ", tags$b("'Agresivos de Combate'"), ", el índice coloca por delante al arquetipo ", tags$b("'Enfocados a Objetivos'"), ". Es una diferencia de puntuación, no un contraste estadístico. Y la popularidad entra en el propio índice con un 10 %, así que las dos cifras comparadas comparten un ingrediente."),
       tags$hr(),
       tags$h4("3. Para Roles de 'Carry', la Consistencia Supera a la Explosividad Ocasional"),
-      tags$p("El análisis de la variabilidad del rendimiento mediante el Coeficiente de Variación (CV) sugiere que, especialmente para roles de daño sostenido como el ", tags$b("ADC (Bottom)"), ", la consistencia es un factor más determinante para el éxito a largo plazo. Un bajo CV en métricas como el KDA —lo que implica evitar partidas muy malas— está más correlacionado con una alta tasa de victorias que la capacidad de tener partidas 'explosivas' de forma esporádica. Esto indica que, en el nivel más alto, la fiabilidad y la mitigación de errores son más valiosas que la búsqueda de jugadas de alto riesgo."),
+      tags$p("El Coeficiente de Variación (CV) mide la irregularidad del rendimiento. Un CV bajo en KDA significa evitar partidas muy malas."),
+      tags$p("La pestaña 'Consistencia del Jugador' dibuja el CV frente a la tasa de victorias y le ajusta una recta. Esa recta es todo lo que se calcula ahí. Esta app no computa ningún coeficiente de correlación, y tampoco compara la fuerza de dos relaciones. No puede decirte cuál pesa más."),
+      tags$p("Mira la pendiente para el rol que te interese. Si baja, en estos datos los jugadores regulares ganan más. La conclusión del TFM sobre los ADC apunta en esa dirección, y su respaldo numérico está en la memoria, no en esta app."),
       tags$hr(),
       tags$h4("4. El Perfil Ideal es un Concepto Dinámico que Evoluciona con el Nivel Competitivo"),
       tags$p("El análisis demuestra que el arquetipo ideal para un rol no es estático, sino que se adapta al ecosistema competitivo de cada rango. El perfil de Jungla que es óptimo en Master (donde la agresividad temprana puede ser más decisiva) no es necesariamente el mismo que en Challenger (donde el control de mapa y la eficiencia de macrojuego son primordiales). Esto valida que el 'meta' es un ecosistema dinámico que evoluciona a medida que aumentan la habilidad y la coordinación de los jugadores."),
