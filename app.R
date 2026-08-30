@@ -351,7 +351,7 @@ server <- function(input, output, session) {
         tags$li(tags$b("Visión por Minuto:"), " Refleja la capacidad del jugador para controlar el mapa y proporcionar información estratégica al equipo."),
         tags$li(tags$b("Índice de Control de Objetivos (OCI v3.0):"), " Métrica personalizada que pondera la participación en la destrucción de torres, dragones e inhibidores. Los pesos proceden de un GLM normalizado. Lasso descartó barones y heraldos, y en Random Forest y XGBoost pesan poco. Fórmula: ", tags$code("OCI = (0.476 * Torres) + (0.397 * Dragones) + (0.127 * Inhibidores)")),
         tags$li(tags$b("Coeficiente de Variación (CV):"), " Mide la irregularidad o volatilidad del rendimiento de un jugador. ", tags$code("CV = desviación típica / media"), ". Un CV bajo indica alta consistencia. Es la métrica clave para el componente 'Salud'."),
-        tags$li(tags$b("Perfil / Clúster:"), " Grupo de jugadores con un estilo de juego similar, identificado automáticamente por el algoritmo de K-Means."),
+        tags$li(tags$b("Perfil / Clúster:"), " Grupo de jugadores con un estilo de juego similar, identificado automáticamente por el algoritmo de K-Means. El número de perfiles está fijado en tres por rol. Es una decisión de interpretabilidad: tres arquetipos se pueden describir y comparar. No sale de un criterio estadístico automático."),
         tags$li(tags$b("Índice de Concentración:"), " Mide si un perfil es más o menos común en una liga que lo esperado por azar (un valor > 1 indica sobrerrepresentación)."),
         tags$li(tags$b("Gráfico de Efectos Locales Acumulados (ALE):"), " Muestra el impacto real de una única variable sobre la probabilidad de victoria. A diferencia de otros métodos como los PDP, los gráficos ALE son robustos ante variables correlacionadas (multicolinealidad) ya que calculan el efecto analizando únicamente combinaciones de datos que ocurren en la realidad. Esto evita distorsiones y ofrece una interpretación más fiable.",
                 tags$ul(
@@ -633,7 +633,7 @@ server <- function(input, output, session) {
       tags$h4("Interpretación Detallada del Modelo"),
       tags$p(tags$strong("Métricas de Rendimiento del Modelo (Random Forest):")),
       tags$ul(
-        tags$li(tags$b("AUC (Área bajo la Curva ROC):"), tags$span(style="color:blue; font-weight:bold;", auc_valor), " - (Calculado con OOB) Capacidad del modelo para distinguir entre victoria y derrota. Más alto es mejor (1.0 es perfecto)."),
+        tags$li(tags$b("AUC (Área bajo la Curva ROC):"), tags$span(style="color:blue; font-weight:bold;", auc_valor), " - (Calculado con OOB) Separa victorias de derrotas; 1.0 es el máximo. ", tags$b("Aviso:"), " todas las variables se miden en la misma partida que el resultado. Para ganar hay que destruir inhibidores. Ese dato forma parte del resultado, no es una señal previa. Este AUC mide asociación con el desenlace, no capacidad de predecirlo por adelantado."),
         tags$li(tags$b("Error de Predicción:"), tags$span(style="color:red; font-weight:bold;", error_tag), " - Porcentaje de predicciones incorrectas sobre nuevos datos. Más bajo es mejor.")
       ),
       tags$hr(),
