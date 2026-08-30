@@ -27,8 +27,7 @@ df_limpio <- datos_raw %>%
   clean_names() %>%
   filter(tier %in% c("MASTER", "GRANDMASTER", "CHALLENGER"), individual_position != "Invalid", game_duration >= 900) %>%
   mutate(
-    obj_epicos = dragon_kills + herald_kills + baron_kills,
-    oci = (0.4 * tower_kills) + (0.3 * inhibitor_kills) + (0.3 * obj_epicos),
+    oci = (0.476 * tower_kills) + (0.397 * dragon_kills) + (0.127 * inhibitor_kills),
     display_name = paste0(game_name, " #", tag_line) 
   )
 
@@ -350,7 +349,7 @@ server <- function(input, output, session) {
         tags$li(tags$b("KDA Ajustado:"), " Mide el rendimiento en combate con la fórmula ", tags$code("(Kills + Assists) / pmax(1, deaths)"), ". Se usa ", tags$code("pmax(1, deaths)"), " para evitar la división por cero sin penalizar a los jugadores con 0 muertes."),
         tags$li(tags$b("Súbditos por Minuto (CS/min):"), " Mide la eficiencia en la acumulación de recursos y experiencia a través de la eliminación de súbditos."),
         tags$li(tags$b("Visión por Minuto:"), " Refleja la capacidad del jugador para controlar el mapa y proporcionar información estratégica al equipo."),
-        tags$li(tags$b("Índice de Control de Objetivos (OCI):"), " Una métrica personalizada que pondera la participación en la destrucción de torres, inhibidores y objetivos épicos. Fórmula: $\\text{OCI} = (0.4 \\times \\text{Torres}) + (0.3 \\times \\text{Inhibidores}) + (0.3 \\times \\text{Objetivos Épicos})$"),
+        tags$li(tags$b("Índice de Control de Objetivos (OCI v3.0):"), " Métrica personalizada que pondera la participación en la destrucción de torres, dragones e inhibidores. Los pesos proceden de un GLM normalizado; barones y heraldos quedaron descartados por Lasso, Random Forest y XGBoost. Fórmula: $\\text{OCI} = (0.476 \\times \\text{Torres}) + (0.397 \\times \\text{Dragones}) + (0.127 \\times \\text{Inhibidores})$"),
         tags$li(tags$b("Coeficiente de Variación (CV):"), " Mide la irregularidad o volatilidad del rendimiento de un jugador. $\\text{CV} = \\sigma / \\mu$. Un CV bajo indica alta consistencia. Es la métrica clave para el componente 'Salud'."),
         tags$li(tags$b("Perfil / Clúster:"), " Grupo de jugadores con un estilo de juego similar, identificado automáticamente por el algoritmo de K-Means."),
         tags$li(tags$b("Índice de Concentración:"), " Mide si un perfil es más o menos común en una liga que lo esperado por azar (un valor > 1 indica sobrerrepresentación)."),

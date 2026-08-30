@@ -4,6 +4,11 @@
 **Live app (v2, English):** [ryse-lol-v2](https://guillermomartindeoliva.shinyapps.io/ryse-lol-v2/)  
 *Revised build: interface translated to English and dashboard improvements over the original thesis submission.*
 
+> **What this repository is:** the earlier **monolithic** build of the dashboard — a single
+> `app.R` with a Spanish interface. The live app linked above is deployed from a separate,
+> newer codebase that is not in this repository, so cloning and running this repo will not
+> reproduce what the link shows.
+
 End-to-end **R** analytics (ETL, clustering, supervised learning, **Shiny**) developed for a postgraduate master's in **Behavioural Data Science** (group thesis, team of five; I led the technical work). The domain is **elite League of Legends** performance; the methods—heterogeneous groups, predictive modelling, interpretability—transfer to behavioural and social-impact work where averages hide who needs different support.
 
 ## Overview
@@ -91,7 +96,7 @@ shiny::runApp("app.R")
 ```
 
 Package versions are **not** pinned — there is no `renv.lock` in this repository, so a fresh
-install takes whatever CRAN currently serves. The live app linked above is the reference build.
+install takes whatever CRAN currently serves.
 
 ## Notes
 
