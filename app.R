@@ -642,7 +642,7 @@ server <- function(input, output, session) {
       tags$p(tags$strong("Métricas de Rendimiento del Modelo (Random Forest):")),
       tags$ul(
         tags$li(tags$b("AUC (Área bajo la Curva ROC):"), tags$span(style="color:blue; font-weight:bold;", auc_valor), " - (Calculado con OOB) Separa victorias de derrotas; 1.0 es el máximo. ", tags$b("Aviso:"), " todas las variables se miden en la misma partida que el resultado. Para ganar hay que destruir inhibidores. Ese dato forma parte del resultado, no es una señal previa. Este AUC mide asociación con el desenlace, no capacidad de predecirlo por adelantado."),
-        tags$li(tags$b("Error de Predicción:"), tags$span(style="color:red; font-weight:bold;", error_tag), " - Porcentaje de predicciones incorrectas (OOB). Cada árbol deja fuera una parte de la muestra y se le pregunta solo por esa parte. Son partidas de la misma muestra, no datos nuevos. Más bajo es mejor.")
+        tags$li(tags$b("Error de Predicción:"), tags$span(style="color:red; font-weight:bold;", error_tag), " - Porcentaje de predicciones incorrectas (OOB). Cada árbol deja fuera una parte de la muestra y se le pregunta solo por esa parte. Son partidas de la misma muestra, no datos nuevos. Le afecta además el mismo aviso que al AUC: las variables se miden en la misma partida que el resultado. Más bajo es mejor.")
       ),
       tags$hr(),
       
@@ -652,11 +652,11 @@ server <- function(input, output, session) {
         top_vars_clean <- as.character(kpi_names_full[top_vars_raw])
         tags$div(
           tags$h4("Jerarquía de Importancia de Variables"),
-          tags$p("Para la selección de filtros actual, la jerarquía de variables más predictivas para la victoria es:"),
+          tags$p("Para la selección de filtros actual, el modelo ordena así las variables por peso. Rige el aviso de arriba: es asociación con el resultado, no capacidad de predecirlo antes."),
           tags$ol(
-            tags$li(tags$b(top_vars_clean[1]), ": Es el factor más determinante."),
-            tags$li(tags$b(top_vars_clean[2]), ": Actúa como un segundo predictor clave."),
-            tags$li(tags$b(top_vars_clean[3]), ": Muestra una influencia significativa.")
+            tags$li(tags$b(top_vars_clean[1]), ": la que más pesa en el modelo."),
+            tags$li(tags$b(top_vars_clean[2]), ": la segunda que más pesa."),
+            tags$li(tags$b(top_vars_clean[3]), ": la tercera.")
           ),
           tags$p("Esta jerarquía proporciona una guía clara sobre qué aspectos del juego se deben priorizar para maximizar las probabilidades de ganar.")
         )
