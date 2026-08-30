@@ -76,9 +76,7 @@ The app includes multiple analysis tabs such as:
 .
 |-- app.R
 |-- data/
-|   |-- ryse_database.csv
-|   |-- high_elo_puuids_euw.csv
-|   `-- random_sample_test.csv
+|   `-- ryse_database.csv
 `-- README.md
 ```
 
